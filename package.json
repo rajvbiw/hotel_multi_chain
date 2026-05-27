@@ -1,0 +1,26 @@
+{
+  "name": "restaurant-platform-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-Cloud Restaurant Chain Platform Monorepo",
+  "workspaces": [
+    "shared",
+    "services/gateway",
+    "services/auth-service",
+    "services/menu-service",
+    "services/order-service",
+    "services/inventory-service",
+    "services/loyalty-service",
+    "services/notification-service",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others -n \"shared,gateway,auth,menu,order,inventory,loyalty,notification,frontend\" -c \"gray,cyan,blue,green,magenta,yellow,red,bgBlue,bgGreen\" \"npm run dev -w shared\" \"npm run dev -w services/gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/menu-service\" \"npm run dev -w services/order-service\" \"npm run dev -w services/inventory-service\" \"npm run dev -w services/loyalty-service\" \"npm run dev -w services/notification-service\" \"npm run dev -w frontend\"",
+    "build": "npm run build --workspaces --if-present",
+    "seed": "npm run seed -w services/menu-service"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}
