@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -35,3 +36,26 @@ ENV NODE_ENV=production
 EXPOSE 5001
 
 CMD [ "npm", "start", "-w", "services/auth-service" ]
+=======
+FROM node:18-alpine
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+
+
+COPY shared/package*.json ./shared/
+COPY services/auth-service/package*.json ./services/auth-service/
+
+RUN npm install
+
+COPY shared/ ./shared/
+COPY services/auth-service/ ./services/auth-service/
+
+RUN npm run build -w shared
+RUN npm run build -w services/auth-service
+
+EXPOSE 5001
+
+CMD ["npm", "start", "-w", "services/auth-service"]
+>>>>>>> 80b4808 (add Gitaction and Terraform)

@@ -9,7 +9,11 @@ import { io, Socket } from 'socket.io-client';
 // =========================================================================
 // API & GATEWAY UTILS
 // =========================================================================
+<<<<<<< HEAD
 const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8000';
+=======
+const GATEWAY_URL = import.meta.env.VITE_API_URL || '__GATEWAY_URL__';
+>>>>>>> 80b4808 (add Gitaction and Terraform)
 
 interface UserPayload {
   id: string;
@@ -145,7 +149,11 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
+<<<<<<< HEAD
     const socketUrl = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8000';
+=======
+    const socketUrl = GATEWAY_URL;
+>>>>>>> 80b4808 (add Gitaction and Terraform)
     console.log(`[WebSocket] Connecting client socket...`);
     const newSocket = io(socketUrl, {
       query: {

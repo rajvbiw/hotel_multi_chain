@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { User } from '../models/user.js';
 import { BadRequestError, UnauthorizedError, ConflictError } from 'shared';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-restaurant-platform';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+const JWT_SECRET: string = process.env.JWT_SECRET ?? 'super-secret-key-restaurant-platform';
+const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN ?? '24h';
+const signOptions: any = { expiresIn: JWT_EXPIRES_IN };
 
 export const signup = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -35,7 +36,11 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId },
       JWT_SECRET,
+<<<<<<< HEAD
       { expiresIn: JWT_EXPIRES_IN as any }
+=======
+      signOptions
+>>>>>>> 80b4808 (add Gitaction and Terraform)
     );
 
     res.status(201).json({
@@ -78,7 +83,11 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId },
       JWT_SECRET,
+<<<<<<< HEAD
       { expiresIn: JWT_EXPIRES_IN as any }
+=======
+      signOptions
+>>>>>>> 80b4808 (add Gitaction and Terraform)
     );
 
     res.json({

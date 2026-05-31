@@ -38,12 +38,12 @@ app.use((req, res, next) => {
 });
 
 // Service Endpoints (Default local microservices ports)
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:5001';
-const MENU_SERVICE_URL = process.env.MENU_SERVICE_URL || 'http://localhost:5002';
-const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://localhost:5003';
-const INVENTORY_SERVICE_URL = process.env.INVENTORY_SERVICE_URL || 'http://localhost:5004';
-const LOYALTY_SERVICE_URL = process.env.LOYALTY_SERVICE_URL || 'http://localhost:5005';
-const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:5006';
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://auth-service:5001';
+const MENU_SERVICE_URL = process.env.MENU_SERVICE_URL || 'http://menu-service:5002';
+const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://order-service:5003';
+const INVENTORY_SERVICE_URL = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:5004';
+const LOYALTY_SERVICE_URL = process.env.LOYALTY_SERVICE_URL || 'http://loyalty-service:5005';
+const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:5006';
 
 // Request Logging
 app.use((req, res, next) => {

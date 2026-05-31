@@ -11,7 +11,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5002;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/restaurant_platform_menu';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://mongo:27017/restaurant_platform_menu';
 
 const corsOptions = {
   origin: '*',

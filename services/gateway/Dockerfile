@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -35,3 +36,31 @@ ENV NODE_ENV=production
 EXPOSE 5000
 
 CMD [ "npm", "start", "-w", "services/gateway" ]
+=======
+FROM node:18-alpine
+
+WORKDIR /usr/src/app
+
+# Copy root workspace package and lock files
+COPY package*.json ./
+
+
+# Copy workspaces configurations
+COPY shared/package*.json ./shared/
+COPY services/gateway/package*.json ./services/gateway/
+
+# Install monorepo dependencies
+RUN npm install
+
+# Copy source code files
+COPY shared/ ./shared/
+COPY services/gateway/ ./services/gateway/
+
+# Build typescript bundles
+RUN npm run build -w shared
+RUN npm run build -w services/gateway
+
+EXPOSE 5000
+
+CMD ["npm", "start", "-w", "services/gateway"]
+>>>>>>> 80b4808 (add Gitaction and Terraform)

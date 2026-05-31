@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -35,3 +36,31 @@ ENV NODE_ENV=production
 EXPOSE 5002
 
 CMD [ "npm", "start", "-w", "services/menu-service" ]
+=======
+FROM node:18-alpine
+
+WORKDIR /usr/src/app
+
+# Copy root workspace package and lock files
+COPY package*.json ./
+
+
+# Copy workspaces configurations
+COPY shared/package*.json ./shared/
+COPY services/menu-service/package*.json ./services/menu-service/
+
+# Install monorepo dependencies
+RUN npm install
+
+# Copy source code files
+COPY shared/ ./shared/
+COPY services/menu-service/ ./services/menu-service/
+
+# Build TypeScript bundles
+RUN npm run build -w shared
+RUN npm run build -w services/menu-service
+
+EXPOSE 5002
+
+CMD ["npm", "start", "-w", "services/menu-service"]
+>>>>>>> 80b4808 (add Gitaction and Terraform)
