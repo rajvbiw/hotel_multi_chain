@@ -9,7 +9,7 @@ import { io, Socket } from 'socket.io-client';
 // =========================================================================
 // API & GATEWAY UTILS
 // =========================================================================
-const GATEWAY_URL = 'http://localhost:5000';
+const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8000';
 
 interface UserPayload {
   id: string;
@@ -145,7 +145,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = 'http://localhost:5000';
+    const socketUrl = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8000';
     console.log(`[WebSocket] Connecting client socket...`);
     const newSocket = io(socketUrl, {
       query: {

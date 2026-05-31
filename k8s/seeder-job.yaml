@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seeder
+  namespace: omnibite
+spec:
+  template:
+    metadata:
+      labels:
+        app: seeder
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seeder
+          image: hotel_multi_chain-seeder:latest
+          imagePullPolicy: IfNotPresent
+          command: ["node", "services/menu-service/dist/seed.js"]
+          env:
+            - name: MONGO_AUTH_URI
+              value: mongodb://mongodb:27017/restaurant_platform_auth
+            - name: MONGO_MENU_URI
+              value: mongodb://mongodb:27017/restaurant_platform_menu
+            - name: MONGO_INVENTORY_URI
+              value: mongodb://mongodb:27017/restaurant_platform_inventory
+            - name: MONGO_LOYALTY_URI
+              value: mongodb://mongodb:27017/restaurant_platform_loyalty
+            - name: MONGO_NOTIFICATION_URI
+              value: mongodb://mongodb:27017/restaurant_platform_notifications

@@ -11,10 +11,31 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// CORS Configuration - Allow requests from frontend
+const corsOptions = {
+  origin: '*', // Allow all origins (or specify 'http://localhost:7070' for production)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+};
+
+app.use(cors(corsOptions));
+// Explicitly handle preflight requests
+app.options('*', cors(corsOptions));
+
 // Gateway needs JSON body parser for local gateway routes, but express-http-proxy doesn't require body parsing if proxying raw body streams.
 // We will specify json parser for non-proxy health-checks, or we can parsed bodies for simple handling.
 app.use(express.json());
+
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Don't set restrictive CSP on API - allow CORS to handle security
+  next();
+});
 
 // Service Endpoints (Default local microservices ports)
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:5001';
@@ -36,6 +57,22 @@ app.get('/health', (req, res) => {
     status: 'UP',
     gateway: 'healthy',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Gateway root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    message: 'API Gateway v1',
+    status: 'online',
+    endpoints: {
+      auth: '/api/v1/auth',
+      menu: '/api/v1/menu',
+      orders: '/api/v1/orders',
+      inventory: '/api/v1/inventory',
+      loyalty: '/api/v1/loyalty',
+      notifications: '/api/v1/notifications'
+    }
   });
 });
 

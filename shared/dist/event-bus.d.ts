@@ -1,7 +1,13 @@
 export type EventCallback = (payload: any) => void | Promise<void>;
 declare class EventBusService {
     private localEmitter;
+    private pubClient;
+    private subClient;
+    private isFallback;
+    private activeSubscriptions;
     constructor();
+    private initializeRedis;
+    private setupRedisSubscription;
     /**
      * Publishes an event to the message bus
      * @param event The event key/channel

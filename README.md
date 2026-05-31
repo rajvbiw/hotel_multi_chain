@@ -85,6 +85,44 @@ The React frontend dashboard will boot on [http://localhost:3000](http://localho
 
 ---
 
+## ☸️ Kubernetes Deployment
+Build the local Docker images first so the cluster can use them:
+```bash
+docker build -t hotel_multi_chain-auth-service:latest -f services/auth-service/Dockerfile .
+docker build -t hotel_multi_chain-menu-service:latest -f services/menu-service/Dockerfile .
+docker build -t hotel_multi_chain-order-service:latest -f services/order-service/Dockerfile .
+docker build -t hotel_multi_chain-inventory-service:latest -f services/inventory-service/Dockerfile .
+docker build -t hotel_multi_chain-loyalty-service:latest -f services/loyalty-service/Dockerfile .
+docker build -t hotel_multi_chain-notification-service:latest -f services/notification-service/Dockerfile .
+docker build -t hotel_multi_chain-gateway:latest -f services/gateway/Dockerfile .
+docker build -t hotel_multi_chain-frontend:latest -f frontend/Dockerfile .
+# If the frontend should target a Kubernetes gateway URL at build time:
+# docker build --build-arg VITE_GATEWAY_URL=http://<gateway-host>:<gateway-port> -t hotel_multi_chain-frontend:latest -f frontend/Dockerfile .
+docker build -t hotel_multi_chain-seeder:latest -f services/menu-service/Dockerfile .
+```
+Apply the cluster resources:
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/apps.yaml
+kubectl apply -f k8s/seeder-job.yaml
+kubectl apply -f k8s/monitoring/blackbox-config.yaml
+kubectl apply -f k8s/monitoring/blackbox-deployment.yaml
+kubectl apply -f k8s/monitoring/prometheus-config.yaml
+kubectl apply -f k8s/monitoring/prometheus-deployment.yaml
+kubectl apply -f k8s/monitoring/grafana-config.yaml
+kubectl apply -f k8s/monitoring/grafana-deployment.yaml
+```
+If you want the frontend to target a cluster gateway at build time, set:
+```bash
+VITE_GATEWAY_URL=http://<gateway-host>:<gateway-port>
+```
+Access the dashboard services through your cluster LoadBalancer or port-forwarding:
+- Frontend: `http://localhost:80` or via cluster external IP
+- Gateway: `http://localhost:80` (if using cluster LoadBalancer)
+- Grafana: `http://localhost:3000`
+
+---
+
 ## 🔒 Verification & Tests
 
 To compile the entire monorepo TypeScript base to production distributions:

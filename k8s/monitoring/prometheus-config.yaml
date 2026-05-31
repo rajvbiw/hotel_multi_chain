@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    scrape_configs:
+      - job_name: 'blackbox-health'
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+          - targets:
+              - http://gateway.omnibite.svc.cluster.local:5000/health
+              - http://auth-service.omnibite.svc.cluster.local:5001/health
+              - http://menu-service.omnibite.svc.cluster.local:5002/health
+              - http://order-service.omnibite.svc.cluster.local:5003/health
+              - http://inventory-service.omnibite.svc.cluster.local:5004/health
+              - http://loyalty-service.omnibite.svc.cluster.local:5005/health
+              - http://notification-service.omnibite.svc.cluster.local:5006/health
+        relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - target_label: __address__
+            replacement: blackbox-exporter.monitoring.svc.cluster.local:9115
+          - source_labels: [__param_target]
+            regex: http://([^/]+).*\n?
+            target_label: instance
+            replacement: $1

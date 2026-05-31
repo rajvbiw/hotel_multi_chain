@@ -11,7 +11,16 @@ const app = express();
 const PORT = process.env.PORT || 5006;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/restaurant_platform_notifications';
 
-app.use(cors());
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  maxAge: 86400
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Request logging middleware

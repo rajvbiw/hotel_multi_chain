@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'omnibite-services'
+    static_configs:
+      - targets:
+          - 'gateway:5000'
+          - 'auth-service:5001'
+          - 'menu-service:5002'
+          - 'order-service:5003'
+          - 'inventory-service:5004'
+          - 'loyalty-service:5005'
+          - 'notification-service:5006'
+    metrics_path: /health
+    scheme: http

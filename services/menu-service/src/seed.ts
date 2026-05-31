@@ -2,11 +2,11 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
 // Database URIs
-const AUTH_URI = 'mongodb://localhost:27017/restaurant_platform_auth';
-const MENU_URI = 'mongodb://localhost:27017/restaurant_platform_menu';
-const INVENTORY_URI = 'mongodb://localhost:27017/restaurant_platform_inventory';
-const LOYALTY_URI = 'mongodb://localhost:27017/restaurant_platform_loyalty';
-const NOTIFICATION_URI = 'mongodb://localhost:27017/restaurant_platform_notifications';
+const AUTH_URI = process.env.MONGO_AUTH_URI || 'mongodb://localhost:27017/restaurant_platform_auth';
+const MENU_URI = process.env.MONGO_MENU_URI || 'mongodb://localhost:27017/restaurant_platform_menu';
+const INVENTORY_URI = process.env.MONGO_INVENTORY_URI || 'mongodb://localhost:27017/restaurant_platform_inventory';
+const LOYALTY_URI = process.env.MONGO_LOYALTY_URI || 'mongodb://localhost:27017/restaurant_platform_loyalty';
+const NOTIFICATION_URI = process.env.MONGO_NOTIFICATION_URI || 'mongodb://localhost:27017/restaurant_platform_notifications';
 
 async function seed() {
   console.log('====================================================');

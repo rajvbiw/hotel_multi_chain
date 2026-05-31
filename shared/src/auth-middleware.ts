@@ -4,6 +4,7 @@ import { UnauthorizedError, ForbiddenError } from './errors.js';
 
 export interface UserPayload {
   id: string;
+  name?: string;
   email: string;
   role: 'customer' | 'admin' | 'kitchen' | 'superadmin';
   branchId?: string;
