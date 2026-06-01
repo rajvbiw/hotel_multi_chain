@@ -277,6 +277,22 @@ jobs:
       - name: 🔍 Terraform Validate
         run: terraform -chdir=infrastructure/terraform validate
 
+      - name: 🔁 Import existing AWS resources into Terraform state
+        run: |
+          cd infrastructure/terraform
+          CLUSTER_NAME=$(grep -E '^cluster_name\s*=\s*".*"' terraform.tfvars terraform.tfvars.example 2>/dev/null | head -n1 | sed -E 's/.*=\s*"(.*)".*/\1/')
+          if [ -z "$CLUSTER_NAME" ]; then
+            CLUSTER_NAME=omnibus-eks-cluster
+          fi
+          # Import IAM roles if they are not already tracked in state
+          terraform state list | grep -Fxq aws_iam_role.eks_cluster_role || terraform import aws_iam_role.eks_cluster_role "$CLUSTER_NAME-cluster-role" || true
+          terraform state list | grep -Fxq aws_iam_role.node_group_role || terraform import aws_iam_role.node_group_role "$CLUSTER_NAME-nodegroup-role" || true
+
+          # Import existing ECR repositories if they are not already tracked
+          for repo in frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service; do
+            terraform state list | grep -Fxq "aws_ecr_repository.repos[\"$repo\"]" || terraform import "aws_ecr_repository.repos[\"$repo\"]" "$repo" || true
+          done
+
       - name: 📋 Terraform Plan
         run: terraform -chdir=infrastructure/terraform plan -out=tfplan
 

@@ -1,7 +1,9 @@
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
+
   tags = {
     Name = "${var.cluster_name}-vpc"
   }
@@ -9,36 +11,48 @@ resource "aws_vpc" "main" {
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
+
   tags = {
     Name = "${var.cluster_name}-igw"
   }
 }
 
 resource "aws_subnet" "public" {
-  for_each                = { for idx, cidr in var.public_subnet_cidrs : idx => cidr }
+  for_each = {
+    for idx, cidr in var.public_subnet_cidrs :
+    tostring(idx) => cidr
+  }
+
   vpc_id                  = aws_vpc.main.id
   cidr_block              = each.value
   availability_zone       = data.aws_availability_zones.available.names[tonumber(each.key)]
   map_public_ip_on_launch = true
+
   tags = {
-    Name = "${var.cluster_name}-public-${each.value}"
+    Name = "${var.cluster_name}-public-${each.key}"
   }
 }
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main.id
   }
+
   tags = {
     Name = "${var.cluster_name}-public-rt"
   }
 }
 
 resource "aws_route_table_association" "public" {
-  for_each       = aws_subnet.public
-  subnet_id      = each.value.id
+  for_each = {
+    "0" = aws_subnet.public["0"].id
+    "1" = aws_subnet.public["1"].id
+  }
+
+  subnet_id      = each.value
   route_table_id = aws_route_table.public.id
 }
 
@@ -71,10 +85,12 @@ resource "aws_iam_role" "eks_cluster_role" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
+
     Statement = [
       {
         Action = "sts:AssumeRole"
         Effect = "Allow"
+
         Principal = {
           Service = "eks.amazonaws.com"
         }
@@ -102,7 +118,10 @@ resource "aws_eks_cluster" "main" {
     security_group_ids = [aws_security_group.eks_cluster.id]
   }
 
-  depends_on = [aws_iam_role_policy_attachment.eks_cluster_AmazonEKSClusterPolicy, aws_iam_role_policy_attachment.eks_cluster_AmazonEKSServicePolicy]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.eks_cluster_AmazonEKSServicePolicy
+  ]
 }
 
 resource "aws_iam_role" "node_group_role" {
@@ -110,10 +129,12 @@ resource "aws_iam_role" "node_group_role" {
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
+
     Statement = [
       {
         Action = "sts:AssumeRole"
         Effect = "Allow"
+
         Principal = {
           Service = "ec2.amazonaws.com"
         }
@@ -141,7 +162,8 @@ resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.cluster_name}-node-group"
   node_role_arn   = aws_iam_role.node_group_role.arn
-  subnet_ids      = values(aws_subnet.public)[*].id
+
+  subnet_ids = values(aws_subnet.public)[*].id
 
   scaling_config {
     desired_size = var.node_group_desired_capacity
@@ -153,13 +175,15 @@ resource "aws_eks_node_group" "main" {
 
   disk_size = 50
 
-  depends_on = [aws_eks_cluster.main]
+  depends_on = [
+    aws_eks_cluster.main
+  ]
 }
 
 resource "aws_ecr_repository" "repos" {
   for_each = toset(var.service_names)
 
-  name                 = replace(each.value, "-", "-")
+  name                 = each.value
   image_tag_mutability = "MUTABLE"
 
   tags = {
