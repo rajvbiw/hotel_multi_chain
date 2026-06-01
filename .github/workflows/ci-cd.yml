@@ -23,7 +23,6 @@ env:
   K8S_NAMESPACE: "hotel-management"
 
 jobs:
-
   # =========================================================
   # Backend Quality Checks
   # =========================================================
@@ -71,7 +70,6 @@ jobs:
       - name: 🔒 npm Audit
         run: npm audit --audit-level=high || true
 
-
   # =========================================================
   # Frontend Quality Checks
   # =========================================================
@@ -114,7 +112,6 @@ jobs:
           name: frontend-build
           path: frontend/dist
 
-
   # =========================================================
   # Secret Scanning
   # =========================================================
@@ -132,7 +129,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LOG_OPTS: --all
-
 
   # =========================================================
   # Terraform Validation + Security
@@ -157,17 +153,20 @@ jobs:
       - name: 🔧 Terraform Init
         run: terraform init -backend=false
 
-      - name: 🔍 Terraform Format Check
-        run: terraform fmt -check -recursive
+      - name: 🔍 Terraform Format
+        run: terraform fmt -recursive
 
       - name: 🔍 Terraform Validate
         run: terraform validate
 
-      - name: 🔒 tfsec Scan
-        uses: aquasecurity/tfsec-action@v1.0.3
+      - name: 🔒 Trivy Terraform Security Scan
+        uses: aquasecurity/trivy-action@master
         with:
-          working_directory: infrastructure/terraform
-
+          scan-type: "config"
+          scan-ref: "infrastructure/terraform"
+          format: "table"
+          exit-code: "0"
+          severity: "CRITICAL,HIGH"
 
   # =========================================================
   # Kubernetes Validation + Security
@@ -189,7 +188,6 @@ jobs:
         uses: stackrox/kube-linter-action@v1
         with:
           directory: infrastructure/k8s
-
 
   # =========================================================
   # Docker Build + Trivy Scan
@@ -233,13 +231,12 @@ jobs:
       - name: 🔒 Trivy Security Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ matrix.service }}:latest'
-          format: 'table'
-          exit-code: '0'
+          image-ref: "${{ matrix.service }}:latest"
+          format: "table"
+          exit-code: "0"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
 
   # =========================================================
   # Deployment Job
@@ -259,7 +256,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 

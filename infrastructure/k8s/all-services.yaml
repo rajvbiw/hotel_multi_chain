@@ -78,7 +78,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: {{AUTH_SERVICE_IMAGE}}
+          image: "{{AUTH_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5001
           env:
@@ -115,7 +115,7 @@ spec:
     spec:
       containers:
         - name: menu-service
-          image: {{MENU_SERVICE_IMAGE}}
+          image: "{{MENU_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5002
           env:
@@ -152,7 +152,7 @@ spec:
     spec:
       containers:
         - name: order-service
-          image: {{ORDER_SERVICE_IMAGE}}
+          image: "{{ORDER_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5003
           env:
@@ -191,7 +191,7 @@ spec:
     spec:
       containers:
         - name: inventory-service
-          image: {{INVENTORY_SERVICE_IMAGE}}
+          image: "{{INVENTORY_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5004
           env:
@@ -265,7 +265,7 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: {{NOTIFICATION_SERVICE_IMAGE}}
+          image: "{{NOTIFICATION_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5006
           env:
@@ -302,7 +302,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: {{GATEWAY_IMAGE}}
+          image: "{{GATEWAY_IMAGE}}"
           ports:
             - containerPort: 5000
           env:
@@ -341,7 +341,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: {{FRONTEND_IMAGE}}
+          image: "{{FRONTEND_IMAGE}}"
           ports:
             - containerPort: 4173
           env:
