@@ -69,6 +69,26 @@ jobs:
       - name: Initialize Terraform
         run: terraform -chdir=infrastructure/terraform init
 
+      - name: Import existing AWS resources into Terraform state
+        run: |
+          set -e
+          cd infrastructure/terraform
+          # Import IAM roles if they exist
+          if aws iam get-role --role-name omnibus-eks-cluster-cluster-role >/dev/null 2>&1; then
+            terraform import aws_iam_role.eks_cluster_role omnibus-eks-cluster-cluster-role || true
+          fi
+          if aws iam get-role --role-name omnibus-eks-cluster-nodegroup-role >/dev/null 2>&1; then
+            terraform import aws_iam_role.node_group_role omnibus-eks-cluster-nodegroup-role || true
+          fi
+
+          # Import ECR repositories if they exist
+          repos=(frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service)
+          for r in "${repos[@]}"; do
+            if aws ecr describe-repositories --repository-names "$r" >/dev/null 2>&1; then
+              terraform import "aws_ecr_repository.repos[\"$r\"]" "$r" || true
+            fi
+          done
+
       - name: Validate Terraform
         run: terraform -chdir=infrastructure/terraform validate
 
