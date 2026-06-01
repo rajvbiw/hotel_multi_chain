@@ -1,3 +1,4 @@
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -15,11 +16,14 @@ spec:
   selector:
     matchLabels:
       app: mongo
+
   replicas: 1
+
   template:
     metadata:
       labels:
         app: mongo
+
     spec:
       securityContext:
         fsGroup: 1001
@@ -35,21 +39,31 @@ spec:
             runAsNonRoot: true
             runAsUser: 1001
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
+
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
 
           resources:
             requests:
               cpu: "100m"
               memory: "128Mi"
+
             limits:
               cpu: "500m"
               memory: "512Mi"
+
+      volumes:
+        - name: mongo-data
+          emptyDir: {}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mongo
+
 spec:
   selector:
     app: mongo
@@ -65,6 +79,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
+
 spec:
   selector:
     matchLabels:
@@ -92,21 +107,31 @@ spec:
             runAsNonRoot: true
             runAsUser: 1001
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
+
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
 
           resources:
             requests:
               cpu: "100m"
               memory: "128Mi"
+
             limits:
               cpu: "500m"
               memory: "512Mi"
+
+      volumes:
+        - name: redis-data
+          emptyDir: {}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
+
 spec:
   selector:
     app: redis
@@ -652,3 +677,4 @@ spec:
       targetPort: 4173
 
   type: LoadBalancer
+
