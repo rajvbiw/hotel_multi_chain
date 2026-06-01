@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -36,7 +36,9 @@ ENV NODE_ENV=production
 EXPOSE 5003
 
 CMD [ "npm", "start", "-w", "services/order-service" ]
-=======
+
+
+
 FROM node:18-alpine
 
 WORKDIR /usr/src/app
@@ -63,4 +65,3 @@ RUN npm run build -w services/order-service
 EXPOSE 5003
 
 CMD ["npm", "start", "-w", "services/order-service"]
->>>>>>> 80b4808 (add Gitaction and Terraform)
