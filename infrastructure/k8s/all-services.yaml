@@ -228,7 +228,7 @@ spec:
     spec:
       containers:
         - name: loyalty-service
-          image: {{LOYALTY_SERVICE_IMAGE}}
+          image: "{{LOYALTY_SERVICE_IMAGE}}"
           ports:
             - containerPort: 5005
           env:
