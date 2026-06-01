@@ -1,105 +1,294 @@
-name: CI/CD Pipeline
+name: 🚀 Hotel Microservices CI/CD + DevSecOps Pipeline
 
 on:
   push:
     branches:
-      - main
+      - "**"
+
   pull_request:
     branches:
       - main
-  workflow_dispatch: {}
+      - develop
+
+  workflow_dispatch:
+
+concurrency:
+  group: hotel-cicd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  AWS_REGION: "us-east-1"
+  CLUSTER_NAME: "omnibus-eks-cluster"
+  K8S_NAMESPACE: "hotel-management"
 
 jobs:
-  build:
-    name: Build and Validate
+
+  # =========================================================
+  # Backend Quality Checks
+  # =========================================================
+  backend-quality:
+    name: 🔧 Backend Quality & Security
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - auth-service
+          - menu-service
+          - order-service
+          - inventory-service
+          - loyalty-service
+          - notification-service
+
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Install dependencies
+      - name: 📦 Install Dependencies
         run: npm install
 
-      - name: Build workspace packages
-        run: npm run build
+      - name: 🔍 ESLint
+        run: npm run lint --if-present
 
-      - name: Validate frontend build
-        working-directory: frontend
-        run: npm run build
+      - name: 🔍 TypeScript Check
+        run: npm run typecheck --if-present
 
-  deploy:
-    name: Deploy to AWS
-    needs: build
+      - name: 🧪 Run Tests
+        run: npm test --if-present
+
+      - name: 🔒 npm Audit
+        run: npm audit --audit-level=high || true
+
+
+  # =========================================================
+  # Frontend Quality Checks
+  # =========================================================
+  frontend-quality:
+    name: 🎨 Frontend Build & Security
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 📦 Install Dependencies
+        run: npm install
+
+      - name: 🔍 ESLint
+        run: npm run lint --if-present
+
+      - name: 🔍 TypeScript Validation
+        run: npm run typecheck --if-present
+
+      - name: 🏗️ Frontend Build
+        run: npm run build
+
+      - name: 🔒 Frontend npm Audit
+        run: npm audit --audit-level=high || true
+
+      - name: 📤 Upload Frontend Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+
+
+  # =========================================================
+  # Secret Scanning
+  # =========================================================
+  secret-scan:
+    name: 🔐 Secret & Credential Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LOG_OPTS: --all
+
+
+  # =========================================================
+  # Terraform Validation + Security
+  # =========================================================
+  terraform-security:
+    name: 🌿 Terraform Validation & Security
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🌿 Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: 🔧 Terraform Init
+        run: terraform init -backend=false
+
+      - name: 🔍 Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: 🔍 Terraform Validate
+        run: terraform validate
+
+      - name: 🔒 tfsec Scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infrastructure/terraform
+
+
+  # =========================================================
+  # Kubernetes Validation + Security
+  # =========================================================
+  kubernetes-security:
+    name: ☸️ Kubernetes Validation & Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate Kubernetes YAML
+        uses: instrumenta/kubeval-action@master
+        with:
+          files: infrastructure/k8s
+
+      - name: 🔒 Kubernetes Security Scan
+        uses: stackrox/kube-linter-action@v1
+        with:
+          directory: infrastructure/k8s
+
+
+  # =========================================================
+  # Docker Build + Trivy Scan
+  # =========================================================
+  docker-security:
+    name: 🐳 Docker Build & Trivy Scan
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - gateway
+          - auth-service
+          - menu-service
+          - order-service
+          - inventory-service
+          - loyalty-service
+          - notification-service
+          - frontend
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Build Docker Image
+        run: |
+          BUILD_PATH="services/${{ matrix.service }}"
+
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            BUILD_PATH="frontend"
+          fi
+
+          docker build \
+            -t ${{ matrix.service }}:latest \
+            -f $BUILD_PATH/Dockerfile \
+            $BUILD_PATH
+
+      - name: 🔒 Trivy Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ matrix.service }}:latest'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+
+  # =========================================================
+  # Deployment Job
+  # =========================================================
+  deploy:
+    name: 🚀 Deploy to AWS EKS
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-quality
+      - frontend-quality
+      - secret-scan
+      - terraform-security
+      - kubernetes-security
+      - docker-security
+
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Cache Terraform plugins and state
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.terraform.d/plugin-cache
-            infrastructure/terraform/.terraform
-          key: terraform-${{ runner.os }}-${{ hashFiles('infrastructure/terraform/**/*.tf') }}
-          restore-keys: |
-            terraform-${{ runner.os }}-
-
-      - name: Setup Terraform
+      - name: 🌿 Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: latest
+          terraform_version: 1.7.0
 
-      - name: Initialize Terraform
+      - name: 🔧 Terraform Init
         run: terraform -chdir=infrastructure/terraform init
 
-      - name: Import existing AWS resources into Terraform state
-        run: |
-          set -e
-          cd infrastructure/terraform
-          # Import IAM roles if they exist
-          if aws iam get-role --role-name omnibus-eks-cluster-cluster-role >/dev/null 2>&1; then
-            terraform import aws_iam_role.eks_cluster_role omnibus-eks-cluster-cluster-role || true
-          fi
-          if aws iam get-role --role-name omnibus-eks-cluster-nodegroup-role >/dev/null 2>&1; then
-            terraform import aws_iam_role.node_group_role omnibus-eks-cluster-nodegroup-role || true
-          fi
-
-          # Import ECR repositories if they exist
-          repos=(frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service)
-          for r in "${repos[@]}"; do
-            if aws ecr describe-repositories --repository-names "$r" >/dev/null 2>&1; then
-              terraform import "aws_ecr_repository.repos[\"$r\"]" "$r" || true
-            fi
-          done
-
-      - name: Validate Terraform
+      - name: 🔍 Terraform Validate
         run: terraform -chdir=infrastructure/terraform validate
 
-      - name: Plan Terraform
+      - name: 📋 Terraform Plan
         run: terraform -chdir=infrastructure/terraform plan -out=tfplan
 
-      - name: Apply Terraform
+      - name: 🚀 Terraform Apply
         run: terraform -chdir=infrastructure/terraform apply -auto-approve tfplan
 
-      - name: Read ECR repository URLs
-        id: ecr
+      - name: 📤 Read Terraform Outputs
+        id: terraform
         run: |
           echo "cluster_name=$(terraform -chdir=infrastructure/terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
           echo "gateway=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_gateway)" >> $GITHUB_OUTPUT
@@ -111,59 +300,91 @@ jobs:
           echo "notification_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_notification_service)" >> $GITHUB_OUTPUT
           echo "frontend=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_frontend)" >> $GITHUB_OUTPUT
 
-      - name: Login to ECR
-        uses: aws-actions/amazon-ecr-login@v1
+      - name: 🔐 Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Setup Docker Buildx
+      - name: 🐳 Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker images with cache
+      - name: 🚢 Build & Push Docker Images
         run: |
           set -e
+
           declare -A repos=(
-            [gateway]="${{ steps.ecr.outputs.gateway }}"
-            [auth-service]="${{ steps.ecr.outputs.auth_service }}"
-            [menu-service]="${{ steps.ecr.outputs.menu_service }}"
-            [order-service]="${{ steps.ecr.outputs.order_service }}"
-            [inventory-service]="${{ steps.ecr.outputs.inventory_service }}"
-            [loyalty-service]="${{ steps.ecr.outputs.loyalty_service }}"
-            [notification-service]="${{ steps.ecr.outputs.notification_service }}"
-            [frontend]="${{ steps.ecr.outputs.frontend }}"
+            [gateway]="${{ steps.terraform.outputs.gateway }}"
+            [auth-service]="${{ steps.terraform.outputs.auth_service }}"
+            [menu-service]="${{ steps.terraform.outputs.menu_service }}"
+            [order-service]="${{ steps.terraform.outputs.order_service }}"
+            [inventory-service]="${{ steps.terraform.outputs.inventory_service }}"
+            [loyalty-service]="${{ steps.terraform.outputs.loyalty_service }}"
+            [notification-service]="${{ steps.terraform.outputs.notification_service }}"
+            [frontend]="${{ steps.terraform.outputs.frontend }}"
           )
 
           for service in "${!repos[@]}"; do
+
             repo=${repos[$service]}
             build_path="services/${service}"
+
             if [ "$service" = "frontend" ]; then
               build_path="frontend"
             fi
-            echo "Building $service -> $repo:latest"
+
+            echo "🚢 Building $service"
+
             docker buildx build \
               --push \
               --tag "$repo:latest" \
               --cache-from=type=registry,ref="$repo:buildcache" \
               --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
-              -f "$build_path/Dockerfile" "$build_path"
+              -f "$build_path/Dockerfile" \
+              "$build_path"
+
           done
 
-      - name: Update kubeconfig
+      - name: ☸️ Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: 🔗 Configure kubeconfig
         run: |
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name "${{ steps.ecr.outputs.cluster_name }}"
+          aws eks update-kubeconfig \
+            --region ${{ secrets.AWS_REGION }} \
+            --name "${{ steps.terraform.outputs.cluster_name }}"
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
-      - name: Deploy Kubernetes resources
+      - name: 📝 Render Kubernetes Manifests
         run: |
           cp -r infrastructure/k8s /tmp/k8s-rendered
-          sed -i "s|{{GATEWAY_IMAGE}}|${{ steps.ecr.outputs.gateway }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{AUTH_SERVICE_IMAGE}}|${{ steps.ecr.outputs.auth_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{MENU_SERVICE_IMAGE}}|${{ steps.ecr.outputs.menu_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{ORDER_SERVICE_IMAGE}}|${{ steps.ecr.outputs.order_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{INVENTORY_SERVICE_IMAGE}}|${{ steps.ecr.outputs.inventory_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{LOYALTY_SERVICE_IMAGE}}|${{ steps.ecr.outputs.loyalty_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{NOTIFICATION_SERVICE_IMAGE}}|${{ steps.ecr.outputs.notification_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{FRONTEND_IMAGE}}|${{ steps.ecr.outputs.frontend }}:latest|g" /tmp/k8s-rendered/*.yaml
+
+          sed -i "s|{{GATEWAY_IMAGE}}|${{ steps.terraform.outputs.gateway }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{AUTH_SERVICE_IMAGE}}|${{ steps.terraform.outputs.auth_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{MENU_SERVICE_IMAGE}}|${{ steps.terraform.outputs.menu_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{ORDER_SERVICE_IMAGE}}|${{ steps.terraform.outputs.order_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{INVENTORY_SERVICE_IMAGE}}|${{ steps.terraform.outputs.inventory_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{LOYALTY_SERVICE_IMAGE}}|${{ steps.terraform.outputs.loyalty_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{NOTIFICATION_SERVICE_IMAGE}}|${{ steps.terraform.outputs.notification_service }}:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{FRONTEND_IMAGE}}|${{ steps.terraform.outputs.frontend }}:latest|g" /tmp/k8s-rendered/*.yaml
+
+      - name: 🚀 Deploy Kubernetes Resources
+        run: |
           kubectl apply -f /tmp/k8s-rendered
+
+      - name: 🔄 Verify Rollouts
+        run: |
+          kubectl rollout status deployment/gateway -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/auth-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/menu-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/order-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/inventory-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/loyalty-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/notification-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+
+      - name: 📊 Cluster Health Check
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
+          kubectl get svc -A
+
+      - name: ✅ Deployment Successful
+        run: |
+          echo "🎉 Enterprise CI/CD + DevSecOps Pipeline Completed Successfully!"
