@@ -14,33 +14,33 @@ output "cluster_ca_certificate" {
 }
 
 output "ecr_repository_url_gateway" {
-  value = aws_ecr_repository.repos["gateway"].repository_url
+  value = try(aws_ecr_repository.repos["gateway"].repository_url, "")
 }
 
 output "ecr_repository_url_auth_service" {
-  value = aws_ecr_repository.repos["auth-service"].repository_url
+  value = try(aws_ecr_repository.repos["auth-service"].repository_url, "")
 }
 
 output "ecr_repository_url_menu_service" {
-  value = aws_ecr_repository.repos["menu-service"].repository_url
+  value = try(aws_ecr_repository.repos["menu-service"].repository_url, "")
 }
 
 output "ecr_repository_url_order_service" {
-  value = aws_ecr_repository.repos["order-service"].repository_url
+  value = try(aws_ecr_repository.repos["order-service"].repository_url, "")
 }
 
 output "ecr_repository_url_inventory_service" {
-  value = aws_ecr_repository.repos["inventory-service"].repository_url
+  value = try(aws_ecr_repository.repos["inventory-service"].repository_url, "")
 }
 
 output "ecr_repository_url_loyalty_service" {
-  value = aws_ecr_repository.repos["loyalty-service"].repository_url
+  value = try(aws_ecr_repository.repos["loyalty-service"].repository_url, "")
 }
 
 output "ecr_repository_url_notification_service" {
-  value = aws_ecr_repository.repos["notification-service"].repository_url
+  value = try(aws_ecr_repository.repos["notification-service"].repository_url, "")
 }
 
 output "ecr_repository_url_frontend" {
-  value = aws_ecr_repository.repos["frontend"].repository_url
+  value = try(aws_ecr_repository.repos["frontend"].repository_url, "")
 }
