@@ -226,7 +226,7 @@ jobs:
           docker build \
             -t ${{ matrix.service }}:latest \
             -f $BUILD_PATH/Dockerfile \
-            $BUILD_PATH
+            .
 
       - name: 🔒 Trivy Security Scan
         uses: aquasecurity/trivy-action@master
@@ -334,7 +334,7 @@ jobs:
               --cache-from=type=registry,ref="$repo:buildcache" \
               --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
               -f "$build_path/Dockerfile" \
-              "$build_path"
+              .
 
           done
 
