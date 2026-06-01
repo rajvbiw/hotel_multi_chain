@@ -37,7 +37,7 @@ variable "node_group_desired_capacity" {
 variable "service_names" {
   description = "List of service names to create ECR repositories for."
   type        = list(string)
-  default     = [
+  default = [
     "gateway",
     "auth-service",
     "menu-service",

@@ -15,10 +15,10 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  for_each = { for idx, cidr in var.public_subnet_cidrs : idx => cidr }
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = each.value
-  availability_zone = data.aws_availability_zones.available.names[tonumber(each.key)]
+  for_each                = { for idx, cidr in var.public_subnet_cidrs : idx => cidr }
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = each.value
+  availability_zone       = data.aws_availability_zones.available.names[tonumber(each.key)]
   map_public_ip_on_launch = true
   tags = {
     Name = "${var.cluster_name}-public-${each.value}"
@@ -37,7 +37,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public" {
-  for_each = aws_subnet.public
+  for_each       = aws_subnet.public
   subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
