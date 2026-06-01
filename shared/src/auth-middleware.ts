@@ -8,7 +8,7 @@ export interface UserPayload {
   email: string;
   role: 'customer' | 'admin' | 'kitchen' | 'superadmin';
   branchId?: string;
-  name?: string;
+  
 }
 
 // Extend Express Request interface

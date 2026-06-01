@@ -36,11 +36,7 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId },
       JWT_SECRET,
-<<<<<<< HEAD
-      { expiresIn: JWT_EXPIRES_IN as any }
-=======
       signOptions
->>>>>>> 80b4808 (add Gitaction and Terraform)
     );
 
     res.status(201).json({
@@ -83,11 +79,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const token = jwt.sign(
       { id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId },
       JWT_SECRET,
-<<<<<<< HEAD
-      { expiresIn: JWT_EXPIRES_IN as any }
-=======
       signOptions
->>>>>>> 80b4808 (add Gitaction and Terraform)
     );
 
     res.json({
