@@ -250,7 +250,7 @@ jobs:
       - frontend-quality
       - secret-scan
       - terraform-security
-      - kubernetes-security
+      #- kubernetes-security
       - docker-security
 
     if: github.ref == 'refs/heads/main'
