@@ -1,77 +1,34 @@
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: hotel-secret
-type: Opaque
-stringData:
-  jwt-secret: "supersecretkey"
-
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongo
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: mongo
-
-  replicas: 1
-
   template:
     metadata:
       labels:
         app: mongo
-
     spec:
-      securityContext:
-        fsGroup: 1001
-
       containers:
         - name: mongo
-          image: mongo:6.0.13
-
+          image: mongo:6.0
           ports:
             - containerPort: 27017
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          volumeMounts:
-            - name: mongo-data
-              mountPath: /data/db
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
-      volumes:
-        - name: mongo-data
-          emptyDir: {}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mongo
-
 spec:
   selector:
     app: mongo
-
   ports:
     - port: 27017
       targetPort: 27017
-
   type: ClusterIP
 
 ---
@@ -79,472 +36,33 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: redis
-
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: redis
-
-  replicas: 1
-
   template:
     metadata:
       labels:
         app: redis
-
     spec:
-      securityContext:
-        fsGroup: 1001
-
       containers:
         - name: redis
-          image: redis:7.2-alpine
-
+          image: redis:7-alpine
           ports:
             - containerPort: 6379
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          volumeMounts:
-            - name: redis-data
-              mountPath: /data
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
-      volumes:
-        - name: redis-data
-          emptyDir: {}
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: redis
-
 spec:
   selector:
     app: redis
-
   ports:
     - port: 6379
       targetPort: 6379
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: auth-service
-
-spec:
-  selector:
-    matchLabels:
-      app: auth-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: auth-service
-
-    spec:
-      containers:
-        - name: auth-service
-          image: "{{AUTH_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5001
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_auth
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: auth-service
-
-spec:
-  selector:
-    app: auth-service
-
-  ports:
-    - port: 5001
-      targetPort: 5001
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: menu-service
-
-spec:
-  selector:
-    matchLabels:
-      app: menu-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: menu-service
-
-    spec:
-      containers:
-        - name: menu-service
-          image: "{{MENU_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5002
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_menu
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: menu-service
-
-spec:
-  selector:
-    app: menu-service
-
-  ports:
-    - port: 5002
-      targetPort: 5002
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-
-spec:
-  selector:
-    matchLabels:
-      app: order-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: order-service
-
-    spec:
-      containers:
-        - name: order-service
-          image: "{{ORDER_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5003
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_order
-
-            - name: REDIS_URL
-              value: redis://redis:6379
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: order-service
-
-spec:
-  selector:
-    app: order-service
-
-  ports:
-    - port: 5003
-      targetPort: 5003
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: inventory-service
-
-spec:
-  selector:
-    matchLabels:
-      app: inventory-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: inventory-service
-
-    spec:
-      containers:
-        - name: inventory-service
-          image: "{{INVENTORY_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5004
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_inventory
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: inventory-service
-
-spec:
-  selector:
-    app: inventory-service
-
-  ports:
-    - port: 5004
-      targetPort: 5004
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: loyalty-service
-
-spec:
-  selector:
-    matchLabels:
-      app: loyalty-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: loyalty-service
-
-    spec:
-      containers:
-        - name: loyalty-service
-          image: "{{LOYALTY_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5005
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_loyalty
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: loyalty-service
-
-spec:
-  selector:
-    app: loyalty-service
-
-  ports:
-    - port: 5005
-      targetPort: 5005
-
-  type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: notification-service
-
-spec:
-  selector:
-    matchLabels:
-      app: notification-service
-
-  replicas: 1
-
-  template:
-    metadata:
-      labels:
-        app: notification-service
-
-    spec:
-      containers:
-        - name: notification-service
-          image: "{{NOTIFICATION_SERVICE_IMAGE}}:v1"
-
-          ports:
-            - containerPort: 5006
-
-          env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_notifications
-
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: notification-service
-
-spec:
-  selector:
-    app: notification-service
-
-  ports:
-    - port: 5006
-      targetPort: 5006
-
   type: ClusterIP
 
 ---
@@ -552,69 +70,36 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gateway
-
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: gateway
-
-  replicas: 1
-
   template:
     metadata:
       labels:
         app: gateway
-
     spec:
       containers:
         - name: gateway
-          image: "{{GATEWAY_IMAGE}}:v1"
-
+          image: "{{GATEWAY_IMAGE}}"
           ports:
             - containerPort: 5000
-
           env:
-            - name: MONGODB_URI
-              value: mongodb://mongo:27017/restaurant_platform_gateway
-
-            - name: REDIS_URL
-              value: redis://redis:6379
-
             - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: hotel-secret
-                  key: jwt-secret
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
+              value: "supersecretkey"
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: gateway
-
 spec:
   selector:
     app: gateway
-
   ports:
     - port: 5000
       targetPort: 5000
-
   type: LoadBalancer
 
 ---
@@ -622,59 +107,31 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
-
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
-
-  replicas: 1
-
   template:
     metadata:
       labels:
         app: frontend
-
     spec:
       containers:
         - name: frontend
-          image: "{{FRONTEND_IMAGE}}:v1"
-
+          image: "{{FRONTEND_IMAGE}}"
           ports:
             - containerPort: 4173
-
-          env:
-            - name: VITE_API_URL
-              value: http://gateway:5000
-
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-
-          resources:
-            requests:
-              cpu: "100m"
-              memory: "128Mi"
-
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-
 spec:
   selector:
     app: frontend
-
   ports:
     - port: 80
       targetPort: 4173
-
   type: LoadBalancer
-
