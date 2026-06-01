@@ -1,25 +1,48 @@
-name: Terraform Deploy to AWS
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch: {}
 
 jobs:
-  terraform:
-    name: Provision AWS Infrastructure
+  build:
+    name: Build and Validate
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build workspace packages
+        run: npm run build
+
+      - name: Validate frontend build
+        working-directory: frontend
+        run: npm run build
+
+  deploy:
+    name: Deploy to AWS
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.7
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
@@ -27,6 +50,21 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Cache Terraform plugins and state
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.terraform.d/plugin-cache
+            infrastructure/terraform/.terraform
+          key: terraform-${{ runner.os }}-${{ hashFiles('infrastructure/terraform/**/*.tf') }}
+          restore-keys: |
+            terraform-${{ runner.os }}-
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.8
 
       - name: Initialize Terraform
         run: terraform -chdir=infrastructure/terraform init
@@ -39,39 +77,6 @@ jobs:
 
       - name: Apply Terraform
         run: terraform -chdir=infrastructure/terraform apply -auto-approve tfplan
-
-  deploy:
-    name: Build and Deploy Container Images
-    needs: terraform
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Setup Terraform for outputs
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.7
-
-      - name: Initialize Terraform
-        run: terraform -chdir=infrastructure/terraform init
 
       - name: Read ECR repository URLs
         id: ecr
@@ -89,7 +94,10 @@ jobs:
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push Docker images
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker images with cache
         run: |
           set -e
           declare -A repos=(
@@ -110,21 +118,24 @@ jobs:
               build_path="frontend"
             fi
             echo "Building $service -> $repo:latest"
-            docker build -t "$repo:latest" -f "$build_path/Dockerfile" "$build_path"
-            docker push "$repo:latest"
+            docker buildx build \
+              --push \
+              --tag "$repo:latest" \
+              --cache-from=type=registry,ref="$repo:buildcache" \
+              --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
+              -f "$build_path/Dockerfile" "$build_path"
           done
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name "${{ steps.ecr.outputs.cluster_name }}"
 
       - name: Setup kubectl
         uses: actions/setup-kubectl@v4
         with:
           version: 'latest'
 
-      - name: Update kubeconfig
-        run: |
-          CLUSTER_NAME=${{ steps.ecr.outputs.cluster_name }}
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name "$CLUSTER_NAME"
-
-      - name: Inject ECR image URLs into Kubernetes manifests
+      - name: Deploy Kubernetes resources
         run: |
           cp -r infrastructure/k8s /tmp/k8s-rendered
           sed -i "s|{{GATEWAY_IMAGE}}|${{ steps.ecr.outputs.gateway }}:latest|g" /tmp/k8s-rendered/*.yaml
