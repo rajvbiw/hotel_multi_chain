@@ -25,7 +25,7 @@ variable "public_subnet_cidrs" {
 variable "node_group_instance_types" {
   description = "EC2 instance types for the EKS managed node group."
   type        = list(string)
-  default     = ["t3.medium"]
+  default     = ["t2.micro"]
 }
 
 variable "node_group_desired_capacity" {
