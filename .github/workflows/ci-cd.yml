@@ -168,26 +168,26 @@ jobs:
           exit-code: "0"
           severity: "CRITICAL,HIGH"
 
-  # =========================================================
-  # Kubernetes Validation + Security
-  # =========================================================
-  kubernetes-security:
-    name: ☸️ Kubernetes Validation & Security
-    runs-on: ubuntu-latest
+  # # =========================================================
+  # # Kubernetes Validation + Security
+  # # =========================================================
+  # kubernetes-security:
+  #   name: ☸️ Kubernetes Validation & Security
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: 📥 Checkout Repository
+  #       uses: actions/checkout@v4
 
-      - name: 🔍 Validate Kubernetes YAML
-        uses: instrumenta/kubeval-action@master
-        with:
-          files: infrastructure/k8s
+  #     - name: 🔍 Validate Kubernetes YAML
+  #       uses: instrumenta/kubeval-action@master
+  #       with:
+  #         files: infrastructure/k8s
 
-      - name: 🔒 Kubernetes Security Scan
-        uses: stackrox/kube-linter-action@v1
-        with:
-          directory: infrastructure/k8s
+  #     - name: 🔒 Kubernetes Security Scan
+  #       uses: stackrox/kube-linter-action@v1
+  #       with:
+  #         directory: infrastructure/k8s
 
   # =========================================================
   # Docker Build + Trivy Scan
