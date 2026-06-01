@@ -131,7 +131,7 @@ jobs:
           aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name "${{ steps.ecr.outputs.cluster_name }}"
 
       - name: Setup kubectl
-        uses: actions/setup-kubectl@v4
+        uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
 
