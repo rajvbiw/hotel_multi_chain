@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Build stage
 FROM node:20-alpine AS builder
 
@@ -31,7 +31,8 @@ COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
-=======
+
+
 FROM node:18-alpine
 
 WORKDIR /app
@@ -52,4 +53,4 @@ RUN npm install -g serve
 EXPOSE 3000
 
 CMD ["sh", "-c", "if [ -n \"$VITE_API_URL\" ]; then find dist -type f -name '*.js' -print0 | xargs -0 sed -i 's|__GATEWAY_URL__|$VITE_API_URL|g'; fi && serve -s dist -l 3000"]
->>>>>>> 80b4808 (add Gitaction and Terraform)
+
