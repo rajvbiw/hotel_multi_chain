@@ -285,24 +285,42 @@ jobs:
             CLUSTER_NAME=omnibus-eks-cluster
           fi
 
-          terraform state list | grep -Fxq aws_vpc.main || terraform import aws_vpc.main "$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=${CLUSTER_NAME}-vpc --query 'Vpcs[0].VpcId' --output text)" || true
-          terraform state list | grep -Fxq aws_internet_gateway.main || terraform import aws_internet_gateway.main "$(aws ec2 describe-internet-gateways --filters Name=tag:Name,Values=${CLUSTER_NAME}-igw --query 'InternetGateways[0].InternetGatewayId' --output text)" || true
+          VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=${CLUSTER_NAME}-vpc --query 'Vpcs[0].VpcId' --output text)
+          if [ -n "$VPC_ID" ]; then
+            terraform state list | grep -Fxq aws_vpc.main || terraform import aws_vpc.main "$VPC_ID" || true
+          fi
+
+          IGW_ID=$(aws ec2 describe-internet-gateways --filters Name=tag:Name,Values=${CLUSTER_NAME}-igw --query 'InternetGateways[0].InternetGatewayId' --output text)
+          if [ -n "$IGW_ID" ]; then
+            terraform state list | grep -Fxq aws_internet_gateway.main || terraform import aws_internet_gateway.main "$IGW_ID" || true
+          fi
 
           for idx in 0 1 2; do
-            terraform state list | grep -Fxq "aws_subnet.public[\"$idx\"]" || terraform import "aws_subnet.public[\"$idx\"]" "$(aws ec2 describe-subnets --filters Name=tag:Name,Values=${CLUSTER_NAME}-public-$idx --query 'Subnets[0].SubnetId' --output text)" || true
+            SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
+            if [ -n "$SUBNET_ID" ]; then
+              terraform state list | grep -Fxq "aws_subnet.public[\"$idx\"]" || terraform import "aws_subnet.public[\"$idx\"]" "$SUBNET_ID" || true
+            fi
           done
 
-          terraform state list | grep -Fxq aws_route_table.public || terraform import aws_route_table.public "$(aws ec2 describe-route-tables --filters Name=tag:Name,Values=${CLUSTER_NAME}-public-rt --query 'RouteTables[0].RouteTableId' --output text)" || true
+          RTB_ID=$(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=tag:Name,Values=${CLUSTER_NAME}-public-rt --query 'RouteTables[0].RouteTableId' --output text)
+          if [ -n "$RTB_ID" ]; then
+            terraform state list | grep -Fxq aws_route_table.public || terraform import aws_route_table.public "$RTB_ID" || true
+          fi
 
           for idx in 0 1; do
-            terraform state list | grep -Fxq "aws_route_table_association.public[\"$idx\"]" || {
-              subnet_id=$(aws ec2 describe-subnets --filters Name=tag:Name,Values=${CLUSTER_NAME}-public-$idx --query 'Subnets[0].SubnetId' --output text)
-              assoc_id=$(aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=$subnet_id --query "RouteTables[0].Associations[?SubnetId=='$subnet_id'].RouteTableAssociationId | [0]" --output text)
-              terraform import "aws_route_table_association.public[\"$idx\"]" "$assoc_id" || true
-            }
+            SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
+            if [ -n "$SUBNET_ID" ]; then
+              ASSOC_ID=$(aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=$SUBNET_ID --query 'RouteTables[0].Associations[0].RouteTableAssociationId' --output text)
+              if [ -n "$ASSOC_ID" ]; then
+                terraform state list | grep -Fxq "aws_route_table_association.public[\"$idx\"]" || terraform import "aws_route_table_association.public[\"$idx\"]" "$ASSOC_ID" || true
+              fi
+            fi
           done
 
-          terraform state list | grep -Fxq aws_security_group.eks_cluster || terraform import aws_security_group.eks_cluster "$(aws ec2 describe-security-groups --filters Name=group-name,Values=${CLUSTER_NAME}-cluster-sg --query 'SecurityGroups[0].GroupId' --output text)" || true
+          SG_ID=$(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID Name=group-name,Values=${CLUSTER_NAME}-cluster-sg --query 'SecurityGroups[0].GroupId' --output text)
+          if [ -n "$SG_ID" ]; then
+            terraform state list | grep -Fxq aws_security_group.eks_cluster || terraform import aws_security_group.eks_cluster "$SG_ID" || true
+          fi
 
           terraform state list | grep -Fxq aws_iam_role.eks_cluster_role || terraform import aws_iam_role.eks_cluster_role "$CLUSTER_NAME-cluster-role" || true
           terraform state list | grep -Fxq aws_iam_role.node_group_role || terraform import aws_iam_role.node_group_role "$CLUSTER_NAME-nodegroup-role" || true
