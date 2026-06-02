@@ -301,9 +301,15 @@ jobs:
           sed -i "s|hotel_multi_chain-gateway:latest|${REPO_PREFIX}/gateway:latest|g" /tmp/k8s-rendered/*.yaml
           sed -i "s|hotel_multi_chain-frontend:latest|${REPO_PREFIX}/frontend:latest|g" /tmp/k8s-rendered/*.yaml
 
-      - name: 🚀 Deploy Kubernetes Resources
+      - name: 🚀 Deploy Kubernetes Namespaces
         run: |
-          kubectl apply -f /tmp/k8s-rendered
+          kubectl apply -f /tmp/k8s-rendered/namespace.yaml
+
+      - name: 🚀 Deploy Kubernetes Applications
+        run: |
+          kubectl apply -f /tmp/k8s-rendered/apps.yaml
+          kubectl apply -f /tmp/k8s-rendered/seeder-job.yaml
+          kubectl apply -R -f /tmp/k8s-rendered/monitoring
 
       - name: 🔄 Verify Rollouts
         id: verify_rollouts
