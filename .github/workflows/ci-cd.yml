@@ -238,26 +238,43 @@ jobs:
       - name: 🐳 Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🚢 Build Docker Compose Images
-        run: |
-          docker compose -f docker-compose.yml build gateway auth-service menu-service order-service inventory-service loyalty-service notification-service frontend
-
-      - name: 🚢 Tag and Push Compose Images to ECR
+      - name: 🚢 Build & Push Docker Images
         run: |
           set -e
 
           ACCOUNT_ID=${{ steps.aws_account.outputs.account_id }}
           REPO_PREFIX="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          SERVICES="gateway auth-service menu-service order-service inventory-service loyalty-service notification-service frontend"
 
-          for service in $SERVICES; do
-            repo="${REPO_PREFIX}/${service}"
+          declare -A repos=(
+            [gateway]="${REPO_PREFIX}/gateway"
+            [auth-service]="${REPO_PREFIX}/auth-service"
+            [menu-service]="${REPO_PREFIX}/menu-service"
+            [order-service]="${REPO_PREFIX}/order-service"
+            [inventory-service]="${REPO_PREFIX}/inventory-service"
+            [loyalty-service]="${REPO_PREFIX}/loyalty-service"
+            [notification-service]="${REPO_PREFIX}/notification-service"
+            [frontend]="${REPO_PREFIX}/frontend"
+          )
+
+          for service in "${!repos[@]}"; do
+            repo="${repos[$service]}"
             aws ecr describe-repositories --repository-names "$service" --region "${{ env.AWS_REGION }}" >/dev/null 2>&1 || \
               aws ecr create-repository --repository-name "$service" --region "${{ env.AWS_REGION }}" >/dev/null
 
-            image_id=$(docker compose -f docker-compose.yml images -q "$service")
-            docker tag "$image_id" "$repo:latest"
-            docker push "$repo:latest"
+            build_path="services/${service}"
+            if [ "$service" = "frontend" ]; then
+              build_path="frontend"
+            fi
+
+            echo "🚢 Building and pushing $service to $repo:latest"
+
+            docker buildx build \
+              --push \
+              --tag "$repo:latest" \
+              --cache-from=type=registry,ref="$repo:buildcache" \
+              --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
+              -f "$build_path/Dockerfile" \
+              .
           done
 
       - name: ☸️ Setup kubectl
@@ -271,18 +288,18 @@ jobs:
 
       - name: 📝 Render Kubernetes Manifests
         run: |
-          cp -r infrastructure/k8s /tmp/k8s-rendered
+          cp -r k8s /tmp/k8s-rendered
 
           REPO_PREFIX="${{ steps.aws_account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
-          sed -i "s|{{GATEWAY_IMAGE}}|${REPO_PREFIX}/gateway:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{AUTH_SERVICE_IMAGE}}|${REPO_PREFIX}/auth-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{MENU_SERVICE_IMAGE}}|${REPO_PREFIX}/menu-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{ORDER_SERVICE_IMAGE}}|${REPO_PREFIX}/order-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{INVENTORY_SERVICE_IMAGE}}|${REPO_PREFIX}/inventory-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{LOYALTY_SERVICE_IMAGE}}|${REPO_PREFIX}/loyalty-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{NOTIFICATION_SERVICE_IMAGE}}|${REPO_PREFIX}/notification-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{FRONTEND_IMAGE}}|${REPO_PREFIX}/frontend:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-auth-service:latest|${REPO_PREFIX}/auth-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-menu-service:latest|${REPO_PREFIX}/menu-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-order-service:latest|${REPO_PREFIX}/order-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-inventory-service:latest|${REPO_PREFIX}/inventory-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-loyalty-service:latest|${REPO_PREFIX}/loyalty-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-notification-service:latest|${REPO_PREFIX}/notification-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-gateway:latest|${REPO_PREFIX}/gateway:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|hotel_multi_chain-frontend:latest|${REPO_PREFIX}/frontend:latest|g" /tmp/k8s-rendered/*.yaml
 
       - name: 🚀 Deploy Kubernetes Resources
         run: |
