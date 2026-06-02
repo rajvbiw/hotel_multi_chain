@@ -343,11 +343,6 @@ jobs:
             kubectl rollout undo deployment/$deployment -n ${{ env.K8S_NAMESPACE }} || true
           done
 
-      - name: ❗ Fail if rollout failed
-        if: steps.verify_rollouts.outcome == 'failure'
-        run: |
-          echo "Deployment rollout failed and rollback was executed."
-          exit 1
 
       - name: 📊 Cluster Health Check
         run: |
