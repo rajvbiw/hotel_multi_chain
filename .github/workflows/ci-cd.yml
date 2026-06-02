@@ -349,6 +349,12 @@ jobs:
           kubectl get nodes
           kubectl get pods -A
           kubectl get svc -A
+          echo "\n--- omnibite service status ---"
+          kubectl get svc -n omnibite
+          kubectl describe svc gateway frontend -n omnibite || true
+          echo "\n--- monitoring service status ---"
+          kubectl get svc -n monitoring
+          kubectl describe svc grafana prometheus -n monitoring || true
 
       - name: ✅ Deployment Successful
         run: |
