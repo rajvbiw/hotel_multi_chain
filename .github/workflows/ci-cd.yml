@@ -20,7 +20,7 @@ env:
   NODE_VERSION: "20"
   AWS_REGION: "us-east-1"
   CLUSTER_NAME: "omnibus-eks-cluster"
-  K8S_NAMESPACE: "hotel-management"
+  K8S_NAMESPACE: "omnibite"
 
 jobs:
   # =========================================================
@@ -254,6 +254,7 @@ jobs:
             [loyalty-service]="${REPO_PREFIX}/loyalty-service"
             [notification-service]="${REPO_PREFIX}/notification-service"
             [frontend]="${REPO_PREFIX}/frontend"
+            [seeder]="${REPO_PREFIX}/seeder"
           )
 
           for service in "${!repos[@]}"; do
@@ -264,6 +265,8 @@ jobs:
             build_path="services/${service}"
             if [ "$service" = "frontend" ]; then
               build_path="frontend"
+            elif [ "$service" = "seeder" ]; then
+              build_path="services/menu-service"
             fi
 
             echo "🚢 Building and pushing $service to $repo:latest"
@@ -292,14 +295,9 @@ jobs:
 
           REPO_PREFIX="${{ steps.aws_account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
-          sed -i "s|hotel_multi_chain-auth-service:latest|${REPO_PREFIX}/auth-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-menu-service:latest|${REPO_PREFIX}/menu-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-order-service:latest|${REPO_PREFIX}/order-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-inventory-service:latest|${REPO_PREFIX}/inventory-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-loyalty-service:latest|${REPO_PREFIX}/loyalty-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-notification-service:latest|${REPO_PREFIX}/notification-service:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-gateway:latest|${REPO_PREFIX}/gateway:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|hotel_multi_chain-frontend:latest|${REPO_PREFIX}/frontend:latest|g" /tmp/k8s-rendered/*.yaml
+          for image in auth-service menu-service order-service inventory-service loyalty-service notification-service gateway frontend seeder; do
+            find /tmp/k8s-rendered -type f -name '*.yaml' -exec sed -i "s|hotel_multi_chain-${image}:latest|${REPO_PREFIX}/${image}:latest|g" {} +
+          done
 
       - name: 🚀 Deploy Kubernetes Namespaces
         run: |
