@@ -176,6 +176,10 @@ resource "aws_eks_node_group" "main" {
 
   disk_size = 50
 
+  lifecycle {
+    prevent_destroy = true
+  }
+
   depends_on = [
     aws_eks_cluster.main
   ]

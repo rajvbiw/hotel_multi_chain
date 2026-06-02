@@ -264,7 +264,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: 🌿 Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -366,7 +366,7 @@ jobs:
       - name: 🔗 Configure kubeconfig
         run: |
           aws eks update-kubeconfig \
-            --region ${{ secrets.AWS_REGION }} \
+            --region ${{ env.AWS_REGION }} \
             --name "${{ steps.terraform.outputs.cluster_name }}"
 
       - name: 📝 Render Kubernetes Manifests
