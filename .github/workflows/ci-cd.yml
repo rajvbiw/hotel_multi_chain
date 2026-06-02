@@ -304,6 +304,7 @@ jobs:
       - name: 🚀 Deploy Kubernetes Applications
         run: |
           kubectl apply -f /tmp/k8s-rendered/apps.yaml
+          kubectl delete job seeder -n ${{ env.K8S_NAMESPACE }} --ignore-not-found
           kubectl apply -f /tmp/k8s-rendered/seeder-job.yaml
           kubectl apply -R -f /tmp/k8s-rendered/monitoring
 
