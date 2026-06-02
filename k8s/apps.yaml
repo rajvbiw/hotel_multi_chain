@@ -1,27 +1,3 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mongodb-pvc
-  namespace: omnibite
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-  namespace: omnibite
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -47,8 +23,7 @@ spec:
               mountPath: /data/db
       volumes:
         - name: mongo-storage
-          persistentVolumeClaim:
-            claimName: mongodb-pvc
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -87,8 +62,7 @@ spec:
               mountPath: /data
       volumes:
         - name: redis-storage
-          persistentVolumeClaim:
-            claimName: redis-pvc
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
