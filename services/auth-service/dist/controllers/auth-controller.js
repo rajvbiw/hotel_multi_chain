@@ -7,14 +7,9 @@ exports.updateProfile = exports.getMe = exports.login = exports.signup = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const user_js_1 = require("../models/user.js");
 const shared_1 = require("shared");
-<<<<<<< HEAD
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key-restaurant-platform';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
-=======
 const JWT_SECRET = process.env.JWT_SECRET ?? 'super-secret-key-restaurant-platform';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '24h';
 const signOptions = { expiresIn: JWT_EXPIRES_IN };
->>>>>>> 80b4808 (add Gitaction and Terraform)
 const signup = async (req, res, next) => {
     try {
         const { name, email, password, role, branchId } = req.body;
@@ -35,11 +30,7 @@ const signup = async (req, res, next) => {
             branchId: branchId || null,
         });
         await user.save();
-<<<<<<< HEAD
-        const token = jsonwebtoken_1.default.sign({ id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-=======
-        const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, signOptions);
->>>>>>> 80b4808 (add Gitaction and Terraform)
+        const token = jsonwebtoken_1.default.sign({ id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, signOptions);
         res.status(201).json({
             success: true,
             message: 'User registered successfully',
@@ -74,11 +65,7 @@ const login = async (req, res, next) => {
         if (!isMatch) {
             throw new shared_1.UnauthorizedError('Invalid email or password');
         }
-<<<<<<< HEAD
-        const token = jsonwebtoken_1.default.sign({ id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-=======
-        const token = jsonwebtoken_1.default.sign({ id: user._id, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, signOptions);
->>>>>>> 80b4808 (add Gitaction and Terraform)
+        const token = jsonwebtoken_1.default.sign({ id: user._id, name: user.name, email: user.email, role: user.role, branchId: user.branchId }, JWT_SECRET, signOptions);
         res.json({
             success: true,
             message: 'Login successful',

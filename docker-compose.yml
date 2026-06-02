@@ -1,10 +1,10 @@
-<<<<<<< HEAD
 version: '3.8'
 
 services:
   mongodb:
     image: mongo:6.0
     container_name: omnibite-mongodb
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
@@ -18,6 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: omnibite-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -33,11 +34,12 @@ services:
       context: .
       dockerfile: services/auth-service/Dockerfile
     container_name: omnibite-auth-service
+    restart: unless-stopped
     ports:
       - "5001:5001"
     environment:
       - PORT=5001
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_auth
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_auth
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=super-secret-key-restaurant-platform
       - JWT_EXPIRES_IN=24h
@@ -52,11 +54,12 @@ services:
       context: .
       dockerfile: services/menu-service/Dockerfile
     container_name: omnibite-menu-service
+    restart: unless-stopped
     ports:
       - "5002:5002"
     environment:
       - PORT=5002
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_menu
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_menu
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:
@@ -69,11 +72,12 @@ services:
       context: .
       dockerfile: services/order-service/Dockerfile
     container_name: omnibite-order-service
+    restart: unless-stopped
     ports:
       - "5003:5003"
     environment:
       - PORT=5003
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_orders
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_orders
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:
@@ -86,11 +90,12 @@ services:
       context: .
       dockerfile: services/inventory-service/Dockerfile
     container_name: omnibite-inventory-service
+    restart: unless-stopped
     ports:
       - "5004:5004"
     environment:
       - PORT=5004
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_inventory
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_inventory
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:
@@ -103,11 +108,12 @@ services:
       context: .
       dockerfile: services/loyalty-service/Dockerfile
     container_name: omnibite-loyalty-service
+    restart: unless-stopped
     ports:
       - "5005:5005"
     environment:
       - PORT=5005
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_loyalty
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_loyalty
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:
@@ -120,56 +126,27 @@ services:
       context: .
       dockerfile: services/notification-service/Dockerfile
     container_name: omnibite-notification-service
+    restart: unless-stopped
     ports:
       - "5006:5006"
     environment:
       - PORT=5006
-      - MONGO_URI=mongodb://mongodb:27017/restaurant_platform_notifications
+      - MONGODB_URI=mongodb://mongodb:27017/restaurant_platform_notifications
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
-=======
-services:
-  mongo:
-    image: mongo:6.0
-    container_name: mongo
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: restaurant_platform
-    healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
->>>>>>> 80b4808 (add Gitaction and Terraform)
 
   gateway:
     build:
       context: .
       dockerfile: services/gateway/Dockerfile
-<<<<<<< HEAD
     container_name: omnibite-gateway
+    restart: unless-stopped
     ports:
-      - "8000:5000"
+      - "5000:5000"
     environment:
       - PORT=5000
       - AUTH_SERVICE_URL=http://auth-service:5001
@@ -179,6 +156,7 @@ services:
       - LOYALTY_SERVICE_URL=http://loyalty-service:5005
       - NOTIFICATION_SERVICE_URL=http://notification-service:5006
       - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=super-secret-key-restaurant-platform
     depends_on:
       auth-service:
         condition: service_started
@@ -210,149 +188,17 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-=======
-    container_name: gateway
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_gateway
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  auth-service:
-    build:
-      context: .
-      dockerfile: services/auth-service/Dockerfile
-    container_name: auth-service
-    restart: unless-stopped
-    ports:
-      - "5001:5001"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_auth
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  menu-service:
-    build:
-      context: .
-      dockerfile: services/menu-service/Dockerfile
-    container_name: menu-service
-    restart: unless-stopped
-    ports:
-      - "5002:5002"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_menu
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  order-service:
-    build:
-      context: .
-      dockerfile: services/order-service/Dockerfile
-    container_name: order-service
-    restart: unless-stopped
-    ports:
-      - "5003:5003"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_order
-      JWT_SECRET: supersecretkey
-      REDIS_URL: redis://redis:6379
-    depends_on:
-      - mongo
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  inventory-service:
-    build:
-      context: .
-      dockerfile: services/inventory-service/Dockerfile
-    container_name: inventory-service
-    restart: unless-stopped
-    ports:
-      - "5004:5004"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_inventory
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  loyalty-service:
-    build:
-      context: .
-      dockerfile: services/loyalty-service/Dockerfile
-    container_name: loyalty-service
-    restart: unless-stopped
-    ports:
-      - "5005:5005"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_loyalty
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5005/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  notification-service:
-    build:
-      context: .
-      dockerfile: services/notification-service/Dockerfile
-    container_name: notification-service
-    restart: unless-stopped
-    ports:
-      - "5006:5006"
-    environment:
-      MONGODB_URI: mongodb://mongo:27017/restaurant_platform_notifications
-      JWT_SECRET: supersecretkey
-    depends_on:
-      - mongo
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5006/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
->>>>>>> 80b4808 (add Gitaction and Terraform)
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-<<<<<<< HEAD
+      args:
+        - VITE_API_URL=http://localhost:5000
     container_name: omnibite-frontend
+    restart: unless-stopped
     ports:
-      - "7070:80"
+      - "3000:80"
     depends_on:
       - gateway
 
@@ -383,7 +229,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3000:3000"
+      - "3001:3000"
     depends_on:
       - prometheus
 
@@ -392,21 +238,3 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
-=======
-    container_name: frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:5000
-    depends_on:
-      - gateway
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  mongo-data:
->>>>>>> 80b4808 (add Gitaction and Terraform)

@@ -12,8 +12,16 @@ const shared_1 = require("shared");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5005;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/restaurant_platform_loyalty';
-app.use((0, cors_1.default)());
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://mongo:27017/restaurant_platform_loyalty';
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    maxAge: 86400
+};
+app.use((0, cors_1.default)(corsOptions));
+app.options('*', (0, cors_1.default)(corsOptions));
 app.use(express_1.default.json());
 // Request logging middleware
 app.use((req, res, next) => {

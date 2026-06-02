@@ -41,10 +41,6 @@ jobs:
           - loyalty-service
           - notification-service
 
-    defaults:
-      run:
-        working-directory: services/${{ matrix.service }}
-
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -55,17 +51,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Workspace Dependencies
         run: npm install
 
+      - name: 🏗️ Build Shared Library
+        run: npm run build -w shared
+
       - name: 🔍 ESLint
-        run: npm run lint --if-present
+        run: npm run lint -w services/${{ matrix.service }} --if-present
 
       - name: 🔍 TypeScript Check
-        run: npm run typecheck --if-present
+        run: npm run typecheck -w services/${{ matrix.service }} --if-present
 
       - name: 🧪 Run Tests
-        run: npm test --if-present
+        run: npm test -w services/${{ matrix.service }} --if-present
 
       - name: 🔒 npm Audit
         run: npm audit --audit-level=high || true
@@ -77,10 +76,6 @@ jobs:
     name: 🎨 Frontend Build & Security
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: frontend
-
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -91,17 +86,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install Workspace Dependencies
         run: npm install
 
+      - name: 🏗️ Build Shared Library
+        run: npm run build -w shared
+
       - name: 🔍 ESLint
-        run: npm run lint --if-present
+        run: npm run lint -w frontend --if-present
 
       - name: 🔍 TypeScript Validation
-        run: npm run typecheck --if-present
+        run: npm run typecheck -w frontend --if-present
 
       - name: 🏗️ Frontend Build
-        run: npm run build
+        run: npm run build -w frontend
 
       - name: 🔒 Frontend npm Audit
         run: npm audit --audit-level=high || true
