@@ -277,78 +277,27 @@ jobs:
       - name: 🔍 Terraform Validate
         run: terraform -chdir=infrastructure/terraform validate
 
-      - name: 🔁 Import existing AWS resources into Terraform state
+      - name: 🔁 Import existing AWS resources (if any)
+        continue-on-error: true
         run: |
           cd infrastructure/terraform
-          CLUSTER_NAME=$(grep -E '^cluster_name\s*=\s*".*"' terraform.tfvars terraform.tfvars.example 2>/dev/null | head -n1 | sed -E 's/.*=\s*"(.*)".*/\1/')
-          if [ -z "$CLUSTER_NAME" ]; then
-            CLUSTER_NAME=omnibus-eks-cluster
-          fi
-
-          VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=${CLUSTER_NAME}-vpc --query 'Vpcs[0].VpcId' --output text)
-          if [ -z "$VPC_ID" ]; then
-            VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=*${CLUSTER_NAME}* --query 'Vpcs[0].VpcId' --output text)
-          fi
-          if [ -n "$VPC_ID" ]; then
-            terraform state list | grep -Fxq aws_vpc.main || terraform import aws_vpc.main "$VPC_ID" || true
-          fi
-
-          IGW_ID=$(aws ec2 describe-internet-gateways --filters Name=tag:Name,Values=${CLUSTER_NAME}-igw --query 'InternetGateways[0].InternetGatewayId' --output text)
-          if [ -z "$IGW_ID" ] && [ -n "$VPC_ID" ]; then
-            IGW_ID=$(aws ec2 describe-internet-gateways --filters Name=attachment.vpc-id,Values=$VPC_ID --query 'InternetGateways[0].InternetGatewayId' --output text)
-          fi
-          if [ -n "$IGW_ID" ]; then
-            terraform state list | grep -Fxq aws_internet_gateway.main || terraform import aws_internet_gateway.main "$IGW_ID" || true
-          fi
-
-          for idx in 0 1 2; do
-            if [ -n "$VPC_ID" ]; then
-              SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
-            else
-              SUBNET_ID=$(aws ec2 describe-subnets --filters Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
-            fi
-            if [ -n "$SUBNET_ID" ]; then
-              terraform state list | grep -Fxq "aws_subnet.public[\"$idx\"]" || terraform import "aws_subnet.public[\"$idx\"]" "$SUBNET_ID" || true
-            fi
-          done
-
-          if [ -n "$VPC_ID" ]; then
-            RTB_ID=$(aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=tag:Name,Values=${CLUSTER_NAME}-public-rt --query 'RouteTables[0].RouteTableId' --output text)
-          else
-            RTB_ID=$(aws ec2 describe-route-tables --filters Name=tag:Name,Values=${CLUSTER_NAME}-public-rt --query 'RouteTables[0].RouteTableId' --output text)
-          fi
-          if [ -n "$RTB_ID" ]; then
-            terraform state list | grep -Fxq aws_route_table.public || terraform import aws_route_table.public "$RTB_ID" || true
-          fi
-
-          for idx in 0 1 2; do
-            if [ -n "$VPC_ID" ]; then
-              SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
-            else
-              SUBNET_ID=$(aws ec2 describe-subnets --filters Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
-            fi
-            if [ -n "$SUBNET_ID" ]; then
-              ASSOC_ID=$(aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=$SUBNET_ID --query 'RouteTables[0].Associations[0].RouteTableAssociationId' --output text)
-              if [ -n "$ASSOC_ID" ]; then
-                terraform state list | grep -Fxq "aws_route_table_association.public\[\"$idx\"\]" || terraform import "aws_route_table_association.public[\"$idx\"]" "$ASSOC_ID" || true
-              fi
-            fi
-          done
-
-          SG_ID=$(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID Name=group-name,Values=${CLUSTER_NAME}-cluster-sg --query 'SecurityGroups[0].GroupId' --output text)
-          if [ -n "$SG_ID" ]; then
-            terraform state list | grep -Fxq aws_security_group.eks_cluster || terraform import aws_security_group.eks_cluster "$SG_ID" || true
-          fi
-
-          terraform state list | grep -Fxq aws_iam_role.eks_cluster_role || terraform import aws_iam_role.eks_cluster_role "$CLUSTER_NAME-cluster-role" || true
-          terraform state list | grep -Fxq aws_iam_role.node_group_role || terraform import aws_iam_role.node_group_role "$CLUSTER_NAME-nodegroup-role" || true
-
-          terraform state list | grep -Fxq aws_eks_cluster.main || terraform import aws_eks_cluster.main "$CLUSTER_NAME" || true
-          terraform state list | grep -Fxq aws_eks_node_group.main || terraform import aws_eks_node_group.main "$CLUSTER_NAME:$CLUSTER_NAME-node-group" || true
-
+          
+          # Only import if resources actually exist
+          CLUSTER_NAME="omnibus-eks-cluster"
+          
+          # Try to import existing roles (will fail silently if not found)
+          terraform state list | grep -Fxq aws_iam_role.eks_cluster_role || terraform import aws_iam_role.eks_cluster_role "$CLUSTER_NAME-cluster-role" 2>/dev/null || true
+          terraform state list | grep -Fxq aws_iam_role.node_group_role || terraform import aws_iam_role.node_group_role "$CLUSTER_NAME-nodegroup-role" 2>/dev/null || true
+          
+          # Try to import existing ECR repos (will fail silently if not found)
           for repo in frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service; do
-            terraform state list | grep -Fxq "aws_ecr_repository.repos[\"$repo\"]" || terraform import "aws_ecr_repository.repos[\"$repo\"]" "$repo" || true
+            terraform state list | grep -Fxq "aws_ecr_repository.repos\[\"$repo\"\]" || terraform import "aws_ecr_repository.repos[$repo]" "$repo" 2>/dev/null || true
           done
+          
+          # Try to import existing cluster (will fail silently if not found)
+          terraform state list | grep -Fxq aws_eks_cluster.main || terraform import aws_eks_cluster.main "$CLUSTER_NAME" 2>/dev/null || true
+          terraform state list | grep -Fxq aws_eks_node_group.main || terraform import aws_eks_node_group.main "$CLUSTER_NAME:$CLUSTER_NAME-node-group" 2>/dev/null || true
+
 
       - name: 📋 Terraform Plan
         run: terraform -chdir=infrastructure/terraform plan -out=tfplan
