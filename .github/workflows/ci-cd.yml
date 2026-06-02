@@ -271,6 +271,7 @@ jobs:
 
             docker buildx build \
               --push \
+              --network host \
               --tag "$repo:latest" \
               --cache-from=type=registry,ref="$repo:buildcache" \
               --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
