@@ -131,45 +131,7 @@ jobs:
           GITLEAKS_LOG_OPTS: --all
 
   # =========================================================
-  # Terraform Validation + Security
-  # =========================================================
-  terraform-security:
-    name: 🌿 Terraform Validation & Security
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: infrastructure/terraform
-
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🌿 Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.7.0
-
-      - name: 🔧 Terraform Init
-        run: terraform init -backend=false
-
-      - name: 🔍 Terraform Format
-        run: terraform fmt -recursive
-
-      - name: 🔍 Terraform Validate
-        run: terraform validate
-
-      - name: 🔒 Trivy Terraform Security Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: "config"
-          scan-ref: "infrastructure/terraform"
-          format: "table"
-          exit-code: "0"
-          severity: "CRITICAL,HIGH"
-
-  # # =========================================================
-  # # Kubernetes Validation + Security
+  # Kubernetes Validation + Security
   # # =========================================================
   # kubernetes-security:
   #   name: ☸️ Kubernetes Validation & Security
@@ -249,7 +211,6 @@ jobs:
       - backend-quality
       - frontend-quality
       - secret-scan
-      - terraform-security
       #- kubernetes-security
       - docker-security
 
@@ -266,87 +227,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🌿 Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.7.0
-
-      - name: 🔧 Terraform Init
-        run: terraform -chdir=infrastructure/terraform init
-
-      - name: 🔍 Terraform Validate
-        run: terraform -chdir=infrastructure/terraform validate
-
-      - name: 🔁 Import existing AWS resources (if any)
-        continue-on-error: true
+      - name: 🧪 Get AWS Account ID
+        id: aws_account
         run: |
-          cd infrastructure/terraform
-          AWS_REGION="${{ env.AWS_REGION }}"
-          CLUSTER_NAME="omnibus-eks-cluster"
-
-          # Try to import networking resources if they already exist
-          VPC_ID=$(aws ec2 describe-vpcs --region "$AWS_REGION" --filters Name=tag:Name,Values="${CLUSTER_NAME}-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
-          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
-            terraform state list | grep -Fxq aws_vpc.main || terraform import aws_vpc.main "$VPC_ID" 2>/dev/null || true
-
-            IGW_ID=$(aws ec2 describe-internet-gateways --region "$AWS_REGION" --filters Name=attachment.vpc-id,Values="$VPC_ID" --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null || true)
-            if [ -n "$IGW_ID" ] && [ "$IGW_ID" != "None" ]; then
-              terraform state list | grep -Fxq aws_internet_gateway.main || terraform import aws_internet_gateway.main "$IGW_ID" 2>/dev/null || true
-            fi
-
-            for idx in 0 1 2; do
-              CIDR="10.0.$((idx + 1)).0/24"
-              SUBNET_ID=$(aws ec2 describe-subnets --region "$AWS_REGION" --filters Name=vpc-id,Values="$VPC_ID" Name=cidr-block,Values="$CIDR" --query 'Subnets[0].SubnetId' --output text 2>/dev/null || true)
-              if [ -n "$SUBNET_ID" ] && [ "$SUBNET_ID" != "None" ]; then
-                terraform state list | grep -Fxq "aws_subnet.public[\"$idx\"]" || terraform import "aws_subnet.public[\"$idx\"]" "$SUBNET_ID" 2>/dev/null || true
-
-                ASSOC_ID=$(aws ec2 describe-route-tables --region "$AWS_REGION" --filters Name=association.subnet-id,Values="$SUBNET_ID" --query 'RouteTables[0].Associations[0].RouteTableAssociationId' --output text 2>/dev/null || true)
-                if [ -n "$ASSOC_ID" ] && [ "$ASSOC_ID" != "None" ]; then
-                  terraform state list | grep -Fxq "aws_route_table_association.public[\"$idx\"]" || terraform import "aws_route_table_association.public[\"$idx\"]" "$ASSOC_ID" 2>/dev/null || true
-                fi
-              fi
-            done
-
-            RTB_ID=$(aws ec2 describe-route-tables --region "$AWS_REGION" --filters Name=vpc-id,Values="$VPC_ID" Name=tag:Name,Values="${CLUSTER_NAME}-public-rt" --query 'RouteTables[0].RouteTableId' --output text 2>/dev/null || true)
-            if [ -n "$RTB_ID" ] && [ "$RTB_ID" != "None" ]; then
-              terraform state list | grep -Fxq aws_route_table.public || terraform import aws_route_table.public "$RTB_ID" 2>/dev/null || true
-            fi
-
-            SG_ID=$(aws ec2 describe-security-groups --region "$AWS_REGION" --filters Name=vpc-id,Values="$VPC_ID" Name=group-name,Values="${CLUSTER_NAME}-cluster-sg" --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
-            if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ]; then
-              terraform state list | grep -Fxq aws_security_group.eks_cluster || terraform import aws_security_group.eks_cluster "$SG_ID" 2>/dev/null || true
-            fi
-          fi
-
-          terraform state list | grep -Fxq aws_iam_role.eks_cluster_role || terraform import aws_iam_role.eks_cluster_role "$CLUSTER_NAME-cluster-role" 2>/dev/null || true
-          terraform state list | grep -Fxq aws_iam_role.node_group_role || terraform import aws_iam_role.node_group_role "$CLUSTER_NAME-nodegroup-role" 2>/dev/null || true
-
-          terraform state list | grep -Fxq aws_eks_cluster.main || terraform import aws_eks_cluster.main "$CLUSTER_NAME" 2>/dev/null || true
-          terraform state list | grep -Fxq aws_eks_node_group.main || terraform import aws_eks_node_group.main "$CLUSTER_NAME:$CLUSTER_NAME-node-group" 2>/dev/null || true
-
-          for repo in frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service; do
-            terraform state list | grep -Fxq "aws_ecr_repository.repos[\"$repo\"]" || terraform import "aws_ecr_repository.repos[\"$repo\"]" "$repo" 2>/dev/null || true
-          done
-
-
-      - name: 📋 Terraform Plan
-        run: terraform -chdir=infrastructure/terraform plan -out=tfplan
-
-      - name: 🚀 Terraform Apply
-        run: terraform -chdir=infrastructure/terraform apply -auto-approve tfplan
-
-      - name: 📤 Read Terraform Outputs
-        id: terraform
-        run: |
-          echo "cluster_name=$(terraform -chdir=infrastructure/terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
-          echo "gateway=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_gateway)" >> $GITHUB_OUTPUT
-          echo "auth_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_auth_service)" >> $GITHUB_OUTPUT
-          echo "menu_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_menu_service)" >> $GITHUB_OUTPUT
-          echo "order_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_order_service)" >> $GITHUB_OUTPUT
-          echo "inventory_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_inventory_service)" >> $GITHUB_OUTPUT
-          echo "loyalty_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_loyalty_service)" >> $GITHUB_OUTPUT
-          echo "notification_service=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_notification_service)" >> $GITHUB_OUTPUT
-          echo "frontend=$(terraform -chdir=infrastructure/terraform output -raw ecr_repository_url_frontend)" >> $GITHUB_OUTPUT
+          echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
 
       - name: 🔐 Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -358,27 +242,21 @@ jobs:
         run: |
           set -e
 
-          declare -A repos=(
-            [gateway]="${{ steps.terraform.outputs.gateway }}"
-            [auth-service]="${{ steps.terraform.outputs.auth_service }}"
-            [menu-service]="${{ steps.terraform.outputs.menu_service }}"
-            [order-service]="${{ steps.terraform.outputs.order_service }}"
-            [inventory-service]="${{ steps.terraform.outputs.inventory_service }}"
-            [loyalty-service]="${{ steps.terraform.outputs.loyalty_service }}"
-            [notification-service]="${{ steps.terraform.outputs.notification_service }}"
-            [frontend]="${{ steps.terraform.outputs.frontend }}"
-          )
+          ACCOUNT_ID=${{ steps.aws_account.outputs.account_id }}
+          REPO_PREFIX="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
-          for service in "${!repos[@]}"; do
-
-            repo=${repos[$service]}
+          for service in gateway auth-service menu-service order-service inventory-service loyalty-service notification-service frontend; do
+            repo="${REPO_PREFIX}/${service}"
             build_path="services/${service}"
 
             if [ "$service" = "frontend" ]; then
               build_path="frontend"
             fi
 
-            echo "🚢 Building $service"
+            echo "🚢 Building and pushing $service to $repo:latest"
+
+            aws ecr describe-repositories --repository-names "$service" --region "${{ env.AWS_REGION }}" >/dev/null 2>&1 || \
+              aws ecr create-repository --repository-name "$service" --region "${{ env.AWS_REGION }}" >/dev/null
 
             docker buildx build \
               --push \
@@ -387,7 +265,6 @@ jobs:
               --cache-to=type=registry,mode=max,ref="$repo:buildcache" \
               -f "$build_path/Dockerfile" \
               .
-
           done
 
       - name: ☸️ Setup kubectl
@@ -397,26 +274,30 @@ jobs:
         run: |
           aws eks update-kubeconfig \
             --region ${{ env.AWS_REGION }} \
-            --name "${{ steps.terraform.outputs.cluster_name }}"
+            --name "${{ env.CLUSTER_NAME }}"
 
       - name: 📝 Render Kubernetes Manifests
         run: |
           cp -r infrastructure/k8s /tmp/k8s-rendered
 
-          sed -i "s|{{GATEWAY_IMAGE}}|${{ steps.terraform.outputs.gateway }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{AUTH_SERVICE_IMAGE}}|${{ steps.terraform.outputs.auth_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{MENU_SERVICE_IMAGE}}|${{ steps.terraform.outputs.menu_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{ORDER_SERVICE_IMAGE}}|${{ steps.terraform.outputs.order_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{INVENTORY_SERVICE_IMAGE}}|${{ steps.terraform.outputs.inventory_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{LOYALTY_SERVICE_IMAGE}}|${{ steps.terraform.outputs.loyalty_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{NOTIFICATION_SERVICE_IMAGE}}|${{ steps.terraform.outputs.notification_service }}:latest|g" /tmp/k8s-rendered/*.yaml
-          sed -i "s|{{FRONTEND_IMAGE}}|${{ steps.terraform.outputs.frontend }}:latest|g" /tmp/k8s-rendered/*.yaml
+          REPO_PREFIX="${{ steps.aws_account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+
+          sed -i "s|{{GATEWAY_IMAGE}}|${REPO_PREFIX}/gateway:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{AUTH_SERVICE_IMAGE}}|${REPO_PREFIX}/auth-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{MENU_SERVICE_IMAGE}}|${REPO_PREFIX}/menu-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{ORDER_SERVICE_IMAGE}}|${REPO_PREFIX}/order-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{INVENTORY_SERVICE_IMAGE}}|${REPO_PREFIX}/inventory-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{LOYALTY_SERVICE_IMAGE}}|${REPO_PREFIX}/loyalty-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{NOTIFICATION_SERVICE_IMAGE}}|${REPO_PREFIX}/notification-service:latest|g" /tmp/k8s-rendered/*.yaml
+          sed -i "s|{{FRONTEND_IMAGE}}|${REPO_PREFIX}/frontend:latest|g" /tmp/k8s-rendered/*.yaml
 
       - name: 🚀 Deploy Kubernetes Resources
         run: |
           kubectl apply -f /tmp/k8s-rendered
 
       - name: 🔄 Verify Rollouts
+        id: verify_rollouts
+        continue-on-error: true
         run: |
           kubectl rollout status deployment/gateway -n ${{ env.K8S_NAMESPACE }} --timeout=300s
           kubectl rollout status deployment/auth-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
@@ -426,6 +307,19 @@ jobs:
           kubectl rollout status deployment/loyalty-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
           kubectl rollout status deployment/notification-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
           kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
+
+      - name: 🔄 Rollback failed deployments
+        if: steps.verify_rollouts.outcome == 'failure'
+        run: |
+          for deployment in gateway auth-service menu-service order-service inventory-service loyalty-service notification-service frontend; do
+            kubectl rollout undo deployment/$deployment -n ${{ env.K8S_NAMESPACE }} || true
+          done
+
+      - name: ❗ Fail if rollout failed
+        if: steps.verify_rollouts.outcome == 'failure'
+        run: |
+          echo "Deployment rollout failed and rollback was executed."
+          exit 1
 
       - name: 📊 Cluster Health Check
         run: |
