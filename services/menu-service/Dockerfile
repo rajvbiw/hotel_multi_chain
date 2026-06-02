@@ -1,67 +1,41 @@
-
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files for installing dependencies
+# Copy root workspace package files
 COPY package*.json ./
 COPY shared/package*.json ./shared/
 COPY services/menu-service/package*.json ./services/menu-service/
 
-# Install dependencies
+# Install all workspace dependencies
 RUN npm ci
 
-# Copy shared library and build it
+# Copy and build shared library first
 COPY shared/ ./shared/
 RUN npm run build -w shared
 
-# Copy menu-service and build it
+# Copy and build menu-service
 COPY services/menu-service/ ./services/menu-service/
 RUN npm run build -w services/menu-service
 
-# Production stage
+# ─── Production Stage ───────────────────────────────────────────────────────
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy built files and dependencies
+# Copy package files for workspace resolution
 COPY package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
+
+# Copy shared lib artifacts
 COPY --from=builder /app/shared/package.json ./shared/
 COPY --from=builder /app/shared/dist ./shared/dist
+
+# Copy service artifacts
 COPY --from=builder /app/services/menu-service/package.json ./services/menu-service/
 COPY --from=builder /app/services/menu-service/dist ./services/menu-service/dist
 
 ENV NODE_ENV=production
-EXPOSE 5002
-
-CMD [ "npm", "start", "-w", "services/menu-service" ]
-
-
-
-FROM node:18-alpine
-
-WORKDIR /usr/src/app
-
-# Copy root workspace package and lock files
-COPY package*.json ./
-
-
-# Copy workspaces configurations
-COPY shared/package*.json ./shared/
-COPY services/menu-service/package*.json ./services/menu-service/
-
-# Install monorepo dependencies
-RUN npm install
-
-# Copy source code files
-COPY shared/ ./shared/
-COPY services/menu-service/ ./services/menu-service/
-
-# Build TypeScript bundles
-RUN npm run build -w shared
-RUN npm run build -w services/menu-service
-
 EXPOSE 5002
 
 CMD ["npm", "start", "-w", "services/menu-service"]
