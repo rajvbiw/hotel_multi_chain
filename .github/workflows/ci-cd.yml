@@ -291,7 +291,7 @@ jobs:
           
           # Try to import existing ECR repos (will fail silently if not found)
           for repo in frontend gateway inventory-service menu-service loyalty-service notification-service auth-service order-service; do
-            terraform state list | grep -Fxq "aws_ecr_repository.repos\[\"$repo\"\]" || terraform import "aws_ecr_repository.repos[$repo]" "$repo" 2>/dev/null || true
+            terraform state list | grep -Fxq "aws_ecr_repository.repos\[\"$repo\"\]" || terraform import "aws_ecr_repository.repos[\"$repo\"]" "$repo" 2>/dev/null || true
           done
           
           # Try to import existing cluster (will fail silently if not found)
