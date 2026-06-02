@@ -198,7 +198,7 @@ services:
     container_name: omnibite-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "8081:8081"
     depends_on:
       - gateway
 
