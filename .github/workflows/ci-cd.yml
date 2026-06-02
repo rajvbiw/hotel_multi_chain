@@ -321,7 +321,7 @@ jobs:
             terraform state list | grep -Fxq aws_route_table.public || terraform import aws_route_table.public "$RTB_ID" || true
           fi
 
-          for idx in 0 1; do
+          for idx in 0 1 2; do
             if [ -n "$VPC_ID" ]; then
               SUBNET_ID=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC_ID Name=cidr-block,Values=10.0.$((idx + 1)).0/24 --query 'Subnets[0].SubnetId' --output text)
             else
@@ -330,7 +330,7 @@ jobs:
             if [ -n "$SUBNET_ID" ]; then
               ASSOC_ID=$(aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=$SUBNET_ID --query 'RouteTables[0].Associations[0].RouteTableAssociationId' --output text)
               if [ -n "$ASSOC_ID" ]; then
-                terraform state list | grep -Fxq "aws_route_table_association.public[\"$idx\"]" || terraform import "aws_route_table_association.public[\"$idx\"]" "$ASSOC_ID" || true
+                terraform state list | grep -Fxq "aws_route_table_association.public\[\"$idx\"\]" || terraform import "aws_route_table_association.public[\"$idx\"]" "$ASSOC_ID" || true
               fi
             fi
           done
