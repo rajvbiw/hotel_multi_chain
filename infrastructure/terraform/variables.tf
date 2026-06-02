@@ -31,7 +31,7 @@ variable "node_group_instance_types" {
 variable "node_group_desired_capacity" {
   description = "Desired number of worker nodes in the node group."
   type        = number
-  default     = 3
+  default     = 1
 }
 
 variable "service_names" {
