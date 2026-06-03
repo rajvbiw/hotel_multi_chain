@@ -29,6 +29,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # -----------------------------------------------------------------
+  # Application services (auth, menu, order, inventory, loyalty, notification, gateway, seeder)
+  # -----------------------------------------------------------------
   auth-service:
     build:
       context: .
@@ -194,13 +197,37 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        - VITE_API_URL=http://localhost:5000
+        - VITE_API_URL=http://host.docker.internal:5000
+    environment:
+      - VITE_API_URL=http://host.docker.internal:5000
     container_name: omnibite-frontend
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "8081:80"
     depends_on:
       - gateway
+
+  # -----------------------------------------------------------------
+  # Monitoring services (added for your request)
+  # -----------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: omnibite-cadvisor
+    ports:
+      - "8082:8080"
+    volumes:
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    privileged: true
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: omnibite-node-exporter
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -218,6 +245,8 @@ services:
       - inventory-service
       - loyalty-service
       - notification-service
+      - cadvisor
+      - node-exporter
 
   grafana:
     image: grafana/grafana:latest
@@ -225,6 +254,9 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro

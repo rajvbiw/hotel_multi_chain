@@ -18,7 +18,7 @@ concurrency:
 
 env:
   NODE_VERSION: "20"
-  AWS_REGION: "us-east-1"
+  AWS_REGION: "us-east-1"          # ✅ Single source of truth — matches Terraform default
   CLUSTER_NAME: "omnibus-eks-cluster"
   K8S_NAMESPACE: "omnibite"
 
@@ -129,27 +129,6 @@ jobs:
           GITLEAKS_LOG_OPTS: --all
 
   # =========================================================
-  # Kubernetes Validation + Security
-  # # =========================================================
-  # kubernetes-security:
-  #   name: ☸️ Kubernetes Validation & Security
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: 📥 Checkout Repository
-  #       uses: actions/checkout@v4
-
-  #     - name: 🔍 Validate Kubernetes YAML
-  #       uses: instrumenta/kubeval-action@master
-  #       with:
-  #         files: infrastructure/k8s
-
-  #     - name: 🔒 Kubernetes Security Scan
-  #       uses: stackrox/kube-linter-action@v1
-  #       with:
-  #         directory: infrastructure/k8s
-
-  # =========================================================
   # Docker Build + Trivy Scan
   # =========================================================
   docker-security:
@@ -199,17 +178,16 @@ jobs:
           severity: "CRITICAL,HIGH"
 
   # =========================================================
-  # Deployment Job
+  # Deployment Job — Only on main branch
   # =========================================================
   deploy:
-    name: 🚀 Deploy to AWS EKS
+    name: 🚀 Deploy to AWS EKS (us-east-1)
     runs-on: ubuntu-latest
 
     needs:
       - backend-quality
       - frontend-quality
       - secret-scan
-      #- kubernetes-security
       - docker-security
 
     if: github.ref == 'refs/heads/main'
@@ -218,25 +196,28 @@ jobs:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
+      # ── AWS Auth ──────────────────────────────────────────
       - name: 🔑 Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}          # ✅ us-east-1
 
       - name: 🧪 Get AWS Account ID
         id: aws_account
         run: |
           echo "account_id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
 
+      # ── ECR Login ─────────────────────────────────────────
       - name: 🔐 Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: 🐳 Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🚢 Build & Push Docker Images
+      # ── Build & Push all Docker images to ECR ─────────────
+      - name: 🚢 Build & Push Docker Images to ECR
         run: |
           set -e
 
@@ -257,8 +238,12 @@ jobs:
 
           for service in "${!repos[@]}"; do
             repo="${repos[$service]}"
-            aws ecr describe-repositories --repository-names "$service" --region "${{ env.AWS_REGION }}" >/dev/null 2>&1 || \
-              aws ecr create-repository --repository-name "$service" --region "${{ env.AWS_REGION }}" >/dev/null
+
+            # Auto-create ECR repo if it doesn't exist
+            aws ecr describe-repositories --repository-names "$service" \
+              --region "${{ env.AWS_REGION }}" > /dev/null 2>&1 || \
+              aws ecr create-repository --repository-name "$service" \
+              --region "${{ env.AWS_REGION }}" > /dev/null
 
             build_path="services/${service}"
             if [ "$service" = "frontend" ]; then
@@ -267,7 +252,7 @@ jobs:
               build_path="services/menu-service"
             fi
 
-            echo "🚢 Building and pushing $service to $repo:latest"
+            echo "🚢 Building and pushing $service → $repo:latest"
 
             docker buildx build \
               --push \
@@ -279,83 +264,150 @@ jobs:
               .
           done
 
+      # ── kubectl Setup ─────────────────────────────────────
       - name: ☸️ Setup kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: 🔗 Configure kubeconfig
+      - name: 🔗 Configure kubeconfig for EKS (us-east-1)
         run: |
+          # ✅ Always use us-east-1 — matches Terraform & env variable
           aws eks update-kubeconfig \
             --region ${{ env.AWS_REGION }} \
             --name "${{ env.CLUSTER_NAME }}"
 
-      - name: 📝 Render Kubernetes Manifests
+          echo "✅ kubeconfig updated for cluster: ${{ env.CLUSTER_NAME }} in ${{ env.AWS_REGION }}"
+          kubectl cluster-info
+
+      # ── Render & Deploy K8s Manifests ─────────────────────
+      - name: 📝 Render Kubernetes Manifests (inject ECR image URLs)
         run: |
           cp -r k8s /tmp/k8s-rendered
 
           REPO_PREFIX="${{ steps.aws_account.outputs.account_id }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
 
-          for image in auth-service menu-service order-service inventory-service loyalty-service notification-service gateway frontend seeder; do
-            find /tmp/k8s-rendered -type f -name '*.yaml' -exec sed -i "s|hotel_multi_chain-${image}:latest|${REPO_PREFIX}/${image}:latest|g" {} +
+          for image in auth-service menu-service order-service inventory-service \
+                       loyalty-service notification-service gateway frontend seeder; do
+            find /tmp/k8s-rendered -type f -name '*.yaml' \
+              -exec sed -i "s|hotel_multi_chain-${image}:latest|${REPO_PREFIX}/${image}:latest|g" {} +
           done
 
-      - name: 🚀 Deploy Kubernetes Namespaces
+          echo "✅ Manifests rendered with ECR prefix: ${REPO_PREFIX}"
+
+      - name: 🚀 Deploy Namespaces
         run: |
           kubectl apply -f /tmp/k8s-rendered/namespace.yaml
+          echo "✅ Namespaces created: omnibite, monitoring"
 
-      - name: 🚀 Deploy Kubernetes Applications
+      - name: 🚀 Deploy Application Services
         run: |
           kubectl apply -f /tmp/k8s-rendered/apps.yaml
+
+          # Recreate seeder job (jobs are immutable, so delete first)
           kubectl delete job seeder -n ${{ env.K8S_NAMESPACE }} --ignore-not-found
           kubectl apply -f /tmp/k8s-rendered/seeder-job.yaml
-          kubectl apply -R -f /tmp/k8s-rendered/monitoring
 
+          echo "✅ Application services deployed to namespace: ${{ env.K8S_NAMESPACE }}"
+
+      - name: 📊 Deploy Monitoring Stack (Prometheus + Grafana)
+        run: |
+          kubectl apply -R -f /tmp/k8s-rendered/monitoring
+          echo "✅ Monitoring stack deployed to namespace: monitoring"
+
+      # ── Verify Rollouts ───────────────────────────────────
       - name: 🔄 Verify Rollouts
         id: verify_rollouts
         continue-on-error: true
         run: |
           set -euo pipefail
 
-          # try to wait for rollouts; capture any failure and dump diagnostics
-          if ! kubectl rollout status deployment/gateway -n ${{ env.K8S_NAMESPACE }} --timeout=300s; then
-            echo "[CI DEBUG] gateway rollout failed, dumping pod status and logs"
-            kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide || true
+          echo "⏳ Waiting for gateway rollout..."
+          if ! kubectl rollout status deployment/gateway \
+               -n ${{ env.K8S_NAMESPACE }} --timeout=300s; then
+            echo "❌ gateway rollout failed — dumping diagnostics"
+            kubectl get pods     -n ${{ env.K8S_NAMESPACE }} -o wide || true
             kubectl describe deployment gateway -n ${{ env.K8S_NAMESPACE }} || true
-            kubectl describe pods -n ${{ env.K8S_NAMESPACE }} --show-events || true
-            for pod in $(kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app=gateway -o name); do
-              echo "----- logs for $pod -----"
-              kubectl logs -n ${{ env.K8S_NAMESPACE }} $pod --all-containers --tail=200 || true
+            for pod in $(kubectl get pods -n ${{ env.K8S_NAMESPACE }} \
+                         -l app=gateway -o name); do
+              echo "----- logs: $pod -----"
+              kubectl logs -n ${{ env.K8S_NAMESPACE }} $pod \
+                --all-containers --tail=200 || true
             done
             exit 1
           fi
 
-          kubectl rollout status deployment/auth-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/menu-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/order-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/inventory-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/loyalty-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/notification-service -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-          kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=300s
-
-      - name: 🔄 Rollback failed deployments
-        if: steps.verify_rollouts.outcome == 'failure'
-        run: |
-          for deployment in gateway auth-service menu-service order-service inventory-service loyalty-service notification-service frontend; do
-            kubectl rollout undo deployment/$deployment -n ${{ env.K8S_NAMESPACE }} || true
+          for svc in auth-service menu-service order-service \
+                     inventory-service loyalty-service notification-service frontend; do
+            echo "⏳ Waiting for $svc rollout..."
+            kubectl rollout status deployment/$svc \
+              -n ${{ env.K8S_NAMESPACE }} --timeout=300s
           done
 
+          echo "✅ All application rollouts successful!"
 
-      - name: 📊 Cluster Health Check
+      # ── Auto-Rollback on Failure ──────────────────────────
+      - name: 🔄 Rollback Failed Deployments
+        if: steps.verify_rollouts.outcome == 'failure'
         run: |
-          kubectl get nodes
-          kubectl get pods -A
-          kubectl get svc -A
-          echo "\n--- omnibite service status ---"
-          kubectl get svc -n omnibite
-          kubectl describe svc gateway frontend -n omnibite || true
-          echo "\n--- monitoring service status ---"
+          echo "⚠️ Rolling back all deployments..."
+          for deployment in gateway auth-service menu-service order-service \
+                            inventory-service loyalty-service notification-service frontend; do
+            kubectl rollout undo deployment/$deployment \
+              -n ${{ env.K8S_NAMESPACE }} || true
+          done
+          echo "✅ Rollback complete"
+
+      # ── Final Health Check ────────────────────────────────
+      - name: 📊 Cluster & Service Health Check
+        run: |
+          echo "=============================="
+          echo "  CLUSTER NODES"
+          echo "=============================="
+          kubectl get nodes -o wide
+
+          echo ""
+          echo "=============================="
+          echo "  APP PODS (namespace: ${{ env.K8S_NAMESPACE }})"
+          echo "=============================="
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
+
+          echo ""
+          echo "=============================="
+          echo "  APP SERVICES — LoadBalancer URLs"
+          echo "=============================="
+          kubectl get svc -n ${{ env.K8S_NAMESPACE }}
+
+          echo ""
+          echo "=============================="
+          echo "  MONITORING PODS (namespace: monitoring)"
+          echo "=============================="
+          kubectl get pods -n monitoring
+
+          echo ""
+          echo "=============================="
+          echo "  MONITORING SERVICES"
+          echo "=============================="
           kubectl get svc -n monitoring
-          kubectl describe svc grafana prometheus -n monitoring || true
+
+          echo ""
+          echo "=============================="
+          echo "  FRONTEND EXTERNAL-IP"
+          echo "=============================="
+          kubectl get svc frontend -n ${{ env.K8S_NAMESPACE }} \
+            -o jsonpath='{"\nFrontend URL: http://"}{.status.loadBalancer.ingress[0].hostname}{"\n"}'
+
+          echo ""
+          echo "=============================="
+          echo "  GATEWAY EXTERNAL-IP"
+          echo "=============================="
+          kubectl get svc gateway -n ${{ env.K8S_NAMESPACE }} \
+            -o jsonpath='{"\nGateway URL: http://"}{.status.loadBalancer.ingress[0].hostname}{"\n"}'
 
       - name: ✅ Deployment Successful
         run: |
-          echo "🎉 Enterprise CI/CD + DevSecOps Pipeline Completed Successfully!"
+          echo ""
+          echo "🎉 ============================================="
+          echo "   Enterprise CI/CD Pipeline Completed!"
+          echo "   Region  : ${{ env.AWS_REGION }}"
+          echo "   Cluster : ${{ env.CLUSTER_NAME }}"
+          echo "   Branch  : ${{ github.ref_name }}"
+          echo "============================================= 🎉"

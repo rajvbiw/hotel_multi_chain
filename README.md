@@ -44,6 +44,41 @@ graph TD
 5. **Real-time Engine**: WebSockets via Socket.io
 6. **Communication**: EventBus Pub/Sub
 
+## 🐳 Docker & Docker Compose
+
+The platform ships with Dockerfiles for each microservice and a `docker-compose.yml` that orchestrates the full stack locally. Run:
+
+```bash
+docker-compose up --build
+```
+
+to spin up all services with a single command.
+
+## 🤖 GitHub Actions CI/CD
+
+Continuous integration and delivery is automated via GitHub Actions. The workflow builds Docker images, pushes them to Amazon ECR, and deploys to an Amazon EKS cluster on every merge to `main`. See `.github/workflows/ci.yml` for the full pipeline.
+
+## 🌩️ Terraform & AWS EKS
+
+Infrastructure as code is managed with Terraform. It provisions:
+
+- VPC with public and private subnets
+- EKS cluster with managed node groups
+- Amazon ECR repositories for each service
+- IAM roles and policies for secure access
+
+Deploy with:
+
+```bash
+cd infrastructure
+terraform init
+terraform apply
+```
+
+## 📈 Monitoring with Grafana & Prometheus
+
+The stack includes Prometheus for metrics collection and Grafana for dashboards. Pre‑configured Helm charts are provided in `k8s/monitoring`. Access Grafana at `http://localhost:3000` (default credentials: admin / admin).
+
 ---
 
 ## ⚡ Quick Start & Development Run

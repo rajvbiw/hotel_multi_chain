@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -91,9 +92,11 @@ spec:
       labels:
         app: auth-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: auth-service
-          image: hotel_multi_chain-auth-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/auth-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5001
@@ -132,9 +135,11 @@ spec:
       labels:
         app: menu-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: menu-service
-          image: hotel_multi_chain-menu-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/menu-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5002
@@ -173,9 +178,11 @@ spec:
       labels:
         app: order-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: order-service
-          image: hotel_multi_chain-order-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/order-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5003
@@ -214,9 +221,11 @@ spec:
       labels:
         app: inventory-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: inventory-service
-          image: hotel_multi_chain-inventory-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/inventory-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5004
@@ -255,9 +264,11 @@ spec:
       labels:
         app: loyalty-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: loyalty-service
-          image: hotel_multi_chain-loyalty-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/loyalty-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5005
@@ -296,9 +307,11 @@ spec:
       labels:
         app: notification-service
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: notification-service
-          image: hotel_multi_chain-notification-service:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/notification-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5006
@@ -329,7 +342,6 @@ metadata:
   namespace: omnibite
 spec:
   replicas: 1
-  progressDeadlineSeconds: 600
   selector:
     matchLabels:
       app: gateway
@@ -338,38 +350,14 @@ spec:
       labels:
         app: gateway
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: gateway
-          image: hotel_multi_chain-gateway:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/gateway:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 5000
-          env:
-            - name: PORT
-              value: "5000"
-            - name: AUTH_SERVICE_URL
-              value: http://auth-service:5001
-            - name: MENU_SERVICE_URL
-              value: http://menu-service:5002
-            - name: ORDER_SERVICE_URL
-              value: http://order-service:5003
-            - name: INVENTORY_SERVICE_URL
-              value: http://inventory-service:5004
-            - name: LOYALTY_SERVICE_URL
-              value: http://loyalty-service:5005
-            - name: NOTIFICATION_SERVICE_URL
-              value: http://notification-service:5006
-            - name: REDIS_URL
-              value: redis://redis:6379
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 5000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 2
-            successThreshold: 1
-            failureThreshold: 3
+            - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -380,7 +368,7 @@ spec:
   type: LoadBalancer
   ports:
     - port: 80
-      targetPort: 5000
+      targetPort: 8080
   selector:
     app: gateway
 ---
@@ -399,9 +387,11 @@ spec:
       labels:
         app: frontend
     spec:
+      imagePullSecrets:
+        - name: ecr-secret
       containers:
         - name: frontend
-          image: hotel_multi_chain-frontend:latest
+          image: 190444052124.dkr.ecr.ap-south-1.amazonaws.com/frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

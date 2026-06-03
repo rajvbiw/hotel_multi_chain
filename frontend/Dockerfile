@@ -29,7 +29,7 @@ COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 8081
+EXPOSE 80
 
 # Premium dynamic runtime API Gateway URL substitution on container startup!
 CMD ["sh", "-c", "if [ -n \"$VITE_API_URL\" ]; then find /usr/share/nginx/html -type f -name '*.js' -print0 | xargs -0 sed -i \"s|__GATEWAY_URL__|$VITE_API_URL|g\"; fi && nginx -g 'daemon off;'"]

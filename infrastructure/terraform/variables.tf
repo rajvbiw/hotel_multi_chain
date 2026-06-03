@@ -1,13 +1,13 @@
 variable "aws_region" {
   description = "AWS region where the cluster and supporting infrastructure will be deployed."
   type        = string
-  default     = "us-east-1"
+  default     = "ap-south-1"
 }
 
 variable "cluster_name" {
   description = "Name of the EKS cluster."
   type        = string
-  default     = "omnibus-eks-cluster"
+  default     = "omnibus-eks-cluster-south"
 }
 
 variable "vpc_cidr" {

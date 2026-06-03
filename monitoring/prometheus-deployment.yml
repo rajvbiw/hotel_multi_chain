@@ -1,0 +1,14 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    # Remove or rename this line:
+    # container_name: omnibite-prometheus   <-- delete or change
+    ports:
+      - "9091:9090"    # note the host side port change
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
